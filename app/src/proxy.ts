@@ -41,12 +41,14 @@ export async function proxy(request: NextRequest) {
   const isAuthorized = !!user && !!adminEmail && user.email === adminEmail;
 
   const { pathname } = request.nextUrl;
-  const isLoginRoute = pathname === "/login";
+  // /privacy must be publicly reachable — TikTok's (and Meta's) app review
+  // fetches it directly, with no session.
+  const isPublicRoute = pathname === "/login" || pathname === "/privacy";
 
-  if (!isLoginRoute && !isAuthorized) {
+  if (!isPublicRoute && !isAuthorized) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  if (isLoginRoute && isAuthorized) {
+  if (pathname === "/login" && isAuthorized) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
@@ -54,5 +56,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // /api/cron/publish authenticates itself via CRON_SECRET (it's hit by an
+  // external scheduler, not a logged-in browser), so it must bypass this
+  // cookie-session gate entirely rather than being redirected to /login.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/cron).*)"],
 };

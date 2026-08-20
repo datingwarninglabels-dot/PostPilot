@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { Post } from "@/lib/posts";
 import {
   approvePostAction,
@@ -8,7 +9,15 @@ import {
   schedulePostAction,
   unschedulePostAction,
   updatePostContentAction,
+  updatePostMediaAction,
 } from "./actions";
+
+/** Instagram and TikTok can't publish text-only posts — Facebook can. */
+const MEDIA_REQUIRED: Record<Post["platform"], boolean> = {
+  facebook: false,
+  instagram: true,
+  tiktok: true,
+};
 
 const STATUS_COLORS: Record<Post["status"], string> = {
   draft: "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
@@ -21,6 +30,7 @@ const STATUS_COLORS: Record<Post["status"], string> = {
 
 function PostCard({ post }: { post: Post }) {
   const [content, setContent] = useState(post.content);
+  const [mediaUrl, setMediaUrl] = useState(post.media_urls[0] ?? "");
   const [scheduledAt, setScheduledAt] = useState(
     post.scheduled_at ? post.scheduled_at.slice(0, 16) : ""
   );
@@ -36,6 +46,8 @@ function PostCard({ post }: { post: Post }) {
   }
 
   const dirty = content !== post.content;
+  const mediaDirty = mediaUrl !== (post.media_urls[0] ?? "");
+  const missingRequiredMedia = MEDIA_REQUIRED[post.platform] && !mediaUrl.trim();
 
   return (
     <div className="rounded border border-black/10 p-4 dark:border-white/10">
@@ -61,6 +73,22 @@ function PostCard({ post }: { post: Post }) {
         className="w-full rounded border border-black/15 px-3 py-2 text-sm dark:border-white/15"
       />
 
+      {post.status !== "published" && (
+        <div className="mt-2">
+          <label className="mb-1 block text-xs font-medium text-neutral-500">
+            Media URL{MEDIA_REQUIRED[post.platform] ? ` (required for ${post.platform})` : " (optional)"}
+          </label>
+          <input
+            type="url"
+            value={mediaUrl}
+            onChange={(e) => setMediaUrl(e.target.value)}
+            disabled={busy}
+            placeholder="https://…/image-or-video.jpg"
+            className="w-full rounded border border-black/15 px-3 py-2 text-sm dark:border-white/15"
+          />
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {dirty && (
           <button
@@ -72,12 +100,23 @@ function PostCard({ post }: { post: Post }) {
           </button>
         )}
 
+        {mediaDirty && (
+          <button
+            disabled={busy}
+            onClick={() => run(() => updatePostMediaAction(post.id, mediaUrl))}
+            className="rounded border border-black/15 px-3 py-1.5 text-sm dark:border-white/15"
+          >
+            Save media URL
+          </button>
+        )}
+
         {(post.status === "draft" || post.status === "rejected") && (
           <>
             <button
-              disabled={busy}
+              disabled={busy || mediaDirty || missingRequiredMedia}
+              title={missingRequiredMedia ? `${post.platform} requires a media URL before approving` : undefined}
               onClick={() => run(() => approvePostAction(post.id))}
-              className="rounded bg-black px-3 py-1.5 text-sm text-white dark:bg-white dark:text-black"
+              className="rounded bg-black px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-black"
             >
               Approve
             </button>
@@ -131,7 +170,7 @@ export function Dashboard({ posts }: { posts: Post[] }) {
   if (posts.length === 0) {
     return (
       <p className="text-sm text-neutral-500">
-        No drafts yet. <a href="/new" className="underline">Generate one</a>.
+        No drafts yet. <Link href="/new" className="underline">Generate one</Link>.
       </p>
     );
   }

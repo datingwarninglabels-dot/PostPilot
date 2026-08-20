@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { draftPostContent } from "@/lib/generate";
+import { deleteConnection } from "@/lib/platform-connections";
 import type { Platform } from "@/lib/posts";
 
 export async function generateDraftAction(input: {
@@ -75,4 +76,24 @@ export async function unschedulePostAction(id: string) {
     .eq("id", id);
   if (error) throw error;
   revalidatePath("/");
+}
+
+/** Instagram/TikTok publishing requires media; Facebook posts as text if left blank. */
+export async function updatePostMediaAction(id: string, mediaUrl: string) {
+  await requireAdmin();
+  const { error } = await getSupabaseAdmin()
+    .from("posts")
+    .update({
+      media_urls: mediaUrl.trim() ? [mediaUrl.trim()] : [],
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/");
+}
+
+export async function disconnectConnectionAction(id: string) {
+  await requireAdmin();
+  await deleteConnection(id);
+  revalidatePath("/connections");
 }

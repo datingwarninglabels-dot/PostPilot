@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { generateDraftAction } from "../actions";
 import type { Platform } from "@/lib/posts";
 
@@ -30,9 +31,9 @@ export default function NewDraftPage() {
 
   return (
     <div className="mx-auto max-w-xl px-6 py-10">
-      <a href="/" className="text-sm text-neutral-500 hover:underline">
+      <Link href="/" className="text-sm text-neutral-500 hover:underline">
         ← Back to dashboard
-      </a>
+      </Link>
       <h1 className="mt-2 mb-6 text-xl font-semibold">New draft from a product description</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>

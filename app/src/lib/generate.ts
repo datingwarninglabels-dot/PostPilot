@@ -1,18 +1,41 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import type { Platform } from "./posts";
 
-let client: Anthropic | null = null;
+type Provider = "openai" | "gemini";
 
-function getClient(): Anthropic {
-  if (client) return client;
-  if (!process.env.ANTHROPIC_API_KEY) {
+function getProvider(): Provider {
+  const raw = process.env.AI_PROVIDER?.trim().toLowerCase();
+  if (!raw || raw === "openai") return "openai";
+  if (raw === "gemini") return "gemini";
+  throw new Error(`Unknown AI_PROVIDER "${raw}" — expected "openai" or "gemini".`);
+}
+
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (openaiClient) return openaiClient;
+  if (!process.env.OPENAI_API_KEY) {
     throw new Error(
-      "Missing ANTHROPIC_API_KEY — copy .env.local.example to .env.local and fill in your Anthropic API key."
+      "Missing OPENAI_API_KEY — copy .env.local.example to .env.local and fill in your OpenAI API key."
     );
   }
-  client = new Anthropic();
-  return client;
+  openaiClient = new OpenAI();
+  return openaiClient;
+}
+
+let geminiClient: GoogleGenAI | null = null;
+
+function getGeminiClient(): GoogleGenAI {
+  if (geminiClient) return geminiClient;
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error(
+      "Missing GEMINI_API_KEY — copy .env.local.example to .env.local and fill in your Gemini API key."
+    );
+  }
+  geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return geminiClient;
 }
 
 const PLATFORM_GUIDANCE: Record<Platform, string> = {
@@ -24,29 +47,51 @@ const PLATFORM_GUIDANCE: Record<Platform, string> = {
     "TikTok caption: very short (under 150 characters), casual/trendy tone, 3-5 hashtags.",
 };
 
+const SYSTEM_PROMPT =
+  "You write social media product-announcement posts for a brand. Output ONLY the post copy itself — no preamble, no explanation, no quotation marks around it.";
+
+function userPrompt(platform: Platform, productDescription: string): string {
+  return `Platform: ${platform}\nStyle: ${PLATFORM_GUIDANCE[platform]}\n\nNew product description:\n${productDescription}\n\nWrite the post.`;
+}
+
+async function draftWithOpenAI(platform: Platform, productDescription: string): Promise<string> {
+  const response = await getOpenAIClient().chat.completions.create({
+    model: "gpt-4o",
+    max_tokens: 1024,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userPrompt(platform, productDescription) },
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content;
+  if (!text) {
+    throw new Error("OpenAI did not return text content");
+  }
+  return text.trim();
+}
+
+async function draftWithGemini(platform: Platform, productDescription: string): Promise<string> {
+  const response = await getGeminiClient().interactions.create({
+    model: "gemini-3.7-flash",
+    input: userPrompt(platform, productDescription),
+    system_instruction: SYSTEM_PROMPT,
+  });
+
+  const text = response.output_text;
+  if (!text) {
+    throw new Error("Gemini did not return text content");
+  }
+  return text.trim();
+}
+
 /** Drafts a single social post's copy from a plain-English product description. Pure text generation — no platform APIs involved. */
 export async function draftPostContent(
   platform: Platform,
   productDescription: string
 ): Promise<string> {
-  const response = await getClient().messages.create({
-    model: "claude-opus-5",
-    max_tokens: 1024,
-    thinking: { type: "disabled" },
-    output_config: { effort: "medium" },
-    system:
-      "You write social media product-announcement posts for a brand. Output ONLY the post copy itself — no preamble, no explanation, no quotation marks around it.",
-    messages: [
-      {
-        role: "user",
-        content: `Platform: ${platform}\nStyle: ${PLATFORM_GUIDANCE[platform]}\n\nNew product description:\n${productDescription}\n\nWrite the post.`,
-      },
-    ],
-  });
-
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("Claude did not return text content");
-  }
-  return textBlock.text.trim();
+  const provider = getProvider();
+  return provider === "gemini"
+    ? draftWithGemini(platform, productDescription)
+    : draftWithOpenAI(platform, productDescription);
 }
