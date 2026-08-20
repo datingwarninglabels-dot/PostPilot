@@ -8,9 +8,13 @@ import { requireAdmin } from "@/lib/auth/require-admin";
  * Login, with its own App ID/Secret and OAuth host (www.instagram.com, not
  * graph.facebook.com). Doesn't require a linked Facebook Page.
  */
-const INSTAGRAM_OAUTH_SCOPES = ["instagram_business_basic", "instagram_business_content_publish"].join(
-  ","
-);
+const INSTAGRAM_OAUTH_SCOPES = [
+  "instagram_business_basic",
+  "instagram_business_content_publish",
+  // Phase 3: read/reply to comments and DMs.
+  "instagram_business_manage_comments",
+  "instagram_business_manage_messages",
+].join(",");
 
 export async function GET() {
   await requireAdmin();

@@ -10,9 +10,15 @@ import { requireAdmin } from "@/lib/auth/require-admin";
  * Facebook Login call without the special "Business Login for Instagram"
  * onboarding flow, which this app doesn't implement.
  */
-const META_OAUTH_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"].join(
-  ","
-);
+const META_OAUTH_SCOPES = [
+  "pages_show_list",
+  "pages_read_engagement",
+  "pages_manage_posts",
+  // Phase 3: pages_manage_engagement reads/replies to Page feed comments;
+  // pages_messaging is required for the Messenger Send API (DM replies).
+  "pages_manage_engagement",
+  "pages_messaging",
+].join(",");
 
 export async function GET() {
   await requireAdmin();

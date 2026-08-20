@@ -95,6 +95,23 @@ export async function GET(request: NextRequest) {
         accountId: page.id,
         accessToken: page.access_token,
       });
+
+      // Phase 3: app-level webhook config alone isn't enough — each Page must
+      // individually subscribe to start receiving feed/messaging events. Non-fatal:
+      // the connection is still useful for publishing even if this call fails.
+      try {
+        const subscribeUrl = new URL(
+          `https://graph.facebook.com/${GRAPH_VERSION}/${page.id}/subscribed_apps`
+        );
+        subscribeUrl.searchParams.set("subscribed_fields", "feed,messages");
+        subscribeUrl.searchParams.set("access_token", page.access_token);
+        const subscribeRes = await fetch(subscribeUrl, { method: "POST" });
+        if (!subscribeRes.ok) {
+          console.error("Facebook Page webhook subscription failed:", await subscribeRes.text());
+        }
+      } catch (err) {
+        console.error("Facebook Page webhook subscription failed:", err);
+      }
     }
 
     return connectionsRedirect(request);

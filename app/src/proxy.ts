@@ -56,8 +56,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // /api/cron/publish authenticates itself via CRON_SECRET (it's hit by an
-  // external scheduler, not a logged-in browser), so it must bypass this
-  // cookie-session gate entirely rather than being redirected to /login.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/cron).*)"],
+  // /api/cron/publish authenticates itself via CRON_SECRET, and /api/webhooks/* via
+  // Meta's own verify_token challenge + X-Hub-Signature-256 — both are hit by external
+  // callers, not a logged-in browser, so both must bypass this cookie-session gate
+  // entirely rather than being redirected to /login.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/cron|api/webhooks).*)"],
 };

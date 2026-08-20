@@ -95,3 +95,62 @@ export async function draftPostContent(
     ? draftWithGemini(platform, productDescription)
     : draftWithOpenAI(platform, productDescription);
 }
+
+const REPLY_SYSTEM_PROMPT =
+  "You write brief, on-brand replies to social media comments and DMs for a brand. Output ONLY the reply text — no preamble, no explanation, no quotation marks. Never promise something the brand can't guarantee.";
+
+function replyUserPrompt(platform: Platform, commentBody: string, postContext?: string): string {
+  const context = postContext ? `Original post this comment is on:\n${postContext}\n\n` : "";
+  return `Platform: ${platform}\n${context}Comment/DM received:\n${commentBody}\n\nWrite a short, friendly reply.`;
+}
+
+async function draftReplyWithOpenAI(
+  platform: Platform,
+  commentBody: string,
+  postContext?: string
+): Promise<string> {
+  const response = await getOpenAIClient().chat.completions.create({
+    model: "gpt-4o",
+    max_tokens: 512,
+    messages: [
+      { role: "system", content: REPLY_SYSTEM_PROMPT },
+      { role: "user", content: replyUserPrompt(platform, commentBody, postContext) },
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content;
+  if (!text) {
+    throw new Error("OpenAI did not return text content");
+  }
+  return text.trim();
+}
+
+async function draftReplyWithGemini(
+  platform: Platform,
+  commentBody: string,
+  postContext?: string
+): Promise<string> {
+  const response = await getGeminiClient().interactions.create({
+    model: "gemini-3.7-flash",
+    input: replyUserPrompt(platform, commentBody, postContext),
+    system_instruction: REPLY_SYSTEM_PROMPT,
+  });
+
+  const text = response.output_text;
+  if (!text) {
+    throw new Error("Gemini did not return text content");
+  }
+  return text.trim();
+}
+
+/** Drafts a reply to an incoming comment/DM. Never sent automatically — only ever a starting point for the admin to review, edit, and approve. */
+export async function draftReplyContent(
+  platform: Platform,
+  commentBody: string,
+  postContext?: string
+): Promise<string> {
+  const provider = getProvider();
+  return provider === "gemini"
+    ? draftReplyWithGemini(platform, commentBody, postContext)
+    : draftReplyWithOpenAI(platform, commentBody, postContext);
+}

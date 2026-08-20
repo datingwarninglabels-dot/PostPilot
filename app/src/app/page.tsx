@@ -13,6 +13,9 @@ export default async function HomePage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold">Drafts</h1>
         <div className="flex items-center gap-4">
+          <Link href="/comments" className="text-sm text-neutral-500 hover:underline">
+            Comments
+          </Link>
           <Link href="/connections" className="text-sm text-neutral-500 hover:underline">
             Connections
           </Link>

@@ -31,9 +31,14 @@ export default function NewDraftPage() {
 
   return (
     <div className="mx-auto max-w-xl px-6 py-10">
-      <Link href="/" className="text-sm text-neutral-500 hover:underline">
-        ← Back to dashboard
-      </Link>
+      <div className="flex items-center gap-4">
+        <Link href="/" className="text-sm text-neutral-500 hover:underline">
+          ← Back to dashboard
+        </Link>
+        <Link href="/comments" className="text-sm text-neutral-500 hover:underline">
+          Comments
+        </Link>
+      </div>
       <h1 className="mt-2 mb-6 text-xl font-semibold">New draft from a product description</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>

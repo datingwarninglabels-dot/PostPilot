@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { draftPostContent } from "@/lib/generate";
-import { deleteConnection } from "@/lib/platform-connections";
+import { draftPostContent, draftReplyContent } from "@/lib/generate";
+import { deleteConnection, getDecryptedConnection } from "@/lib/platform-connections";
+import { getCommentById } from "@/lib/comments";
+import { sendReply as sendFacebookReply } from "@/lib/repliers/facebook";
+import { sendReply as sendInstagramReply } from "@/lib/repliers/instagram";
 import type { Platform } from "@/lib/posts";
 
 export async function generateDraftAction(input: {
@@ -96,4 +99,105 @@ export async function disconnectConnectionAction(id: string) {
   await requireAdmin();
   await deleteConnection(id);
   revalidatePath("/connections");
+}
+
+export async function generateReplyDraftAction(commentId: string) {
+  await requireAdmin();
+  const comment = await getCommentById(commentId);
+  if (!comment) throw new Error("Comment not found");
+
+  const draft_text = await draftReplyContent(comment.platform, comment.body);
+
+  const { error } = await getSupabaseAdmin()
+    .from("replies")
+    .insert({ comment_id: commentId, draft_text });
+  if (error) throw error;
+
+  const { error: statusError } = await getSupabaseAdmin()
+    .from("comments")
+    .update({ status: "reply_drafted" })
+    .eq("id", commentId);
+  if (statusError) throw statusError;
+
+  revalidatePath("/comments");
+}
+
+export async function updateReplyDraftAction(replyId: string, text: string) {
+  await requireAdmin();
+  const { error } = await getSupabaseAdmin()
+    .from("replies")
+    .update({ draft_text: text, updated_at: new Date().toISOString() })
+    .eq("id", replyId);
+  if (error) throw error;
+  revalidatePath("/comments");
+}
+
+export async function approveReplyAction(replyId: string, commentId: string) {
+  await requireAdmin();
+  const { error } = await getSupabaseAdmin()
+    .from("replies")
+    .update({ status: "approved", updated_at: new Date().toISOString() })
+    .eq("id", replyId);
+  if (error) throw error;
+
+  const { error: statusError } = await getSupabaseAdmin()
+    .from("comments")
+    .update({ status: "reply_approved" })
+    .eq("id", commentId);
+  if (statusError) throw statusError;
+
+  revalidatePath("/comments");
+}
+
+/** Terminal — mirrors rejectPostAction. The comment stays visible; the admin can generate a fresh draft. */
+export async function rejectReplyAction(replyId: string) {
+  await requireAdmin();
+  const { error } = await getSupabaseAdmin()
+    .from("replies")
+    .update({ status: "rejected", updated_at: new Date().toISOString() })
+    .eq("id", replyId);
+  if (error) throw error;
+  revalidatePath("/comments");
+}
+
+export async function sendReplyAction(replyId: string) {
+  await requireAdmin();
+  const supabase = getSupabaseAdmin();
+
+  const { data: reply, error: replyError } = await supabase
+    .from("replies")
+    .select("*")
+    .eq("id", replyId)
+    .single();
+  if (replyError) throw replyError;
+
+  const comment = await getCommentById(reply.comment_id);
+  if (!comment) throw new Error("Comment not found");
+
+  const connection = await getDecryptedConnection(comment.platform);
+  if (!connection) throw new Error(`No connected ${comment.platform} account.`);
+
+  const sender =
+    comment.platform === "facebook"
+      ? sendFacebookReply
+      : comment.platform === "instagram"
+        ? sendInstagramReply
+        : null;
+  if (!sender) throw new Error(`Replying isn't supported for ${comment.platform}.`);
+
+  const platform_reply_id = await sender(connection, comment, reply.draft_text);
+
+  const { error: sentError } = await supabase
+    .from("replies")
+    .update({ status: "sent", sent_at: new Date().toISOString(), platform_reply_id })
+    .eq("id", replyId);
+  if (sentError) throw sentError;
+
+  const { error: commentError } = await supabase
+    .from("comments")
+    .update({ status: "replied" })
+    .eq("id", comment.id);
+  if (commentError) throw commentError;
+
+  revalidatePath("/comments");
 }

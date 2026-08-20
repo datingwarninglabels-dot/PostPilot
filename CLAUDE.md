@@ -55,7 +55,8 @@ boundary; proxy.ts's redirect is only an optimistic convenience, per Next's own 
 Copy `app/.env.local.example` to `app/.env.local` and fill in: Supabase URL/anon key/service role key,
 `ADMIN_EMAIL`, `AI_PROVIDER` + the matching provider key (`OPENAI_API_KEY` or `GEMINI_API_KEY`) (Phase
 1); `META_APP_ID`/`META_APP_SECRET`, `TIKTOK_CLIENT_KEY`/`TIKTOK_CLIENT_SECRET`, `APP_BASE_URL`,
-`TOKEN_ENCRYPTION_KEY`, `CRON_SECRET` (Phase 2 — all in use now, see below).
+`TOKEN_ENCRYPTION_KEY`, `CRON_SECRET` (Phase 2 — all in use now, see below);
+`META_WEBHOOK_VERIFY_TOKEN`/`INSTAGRAM_WEBHOOK_VERIFY_TOKEN` (Phase 3, see "Comments + replies" below).
 
 The schema (applied directly via migration, not yet checked into a `supabase/migrations/` folder —
 do that whenever `supabase db pull`/`link` gets set up) defines:
@@ -68,8 +69,8 @@ do that whenever `supabase db pull`/`link` gets set up) defines:
   `access_token_encrypted`/`refresh_token_encrypted` are named to force the point: encrypt at the
   application layer with a server-side secret before insert — this column is ciphertext, not a raw
   token holder.
-- `comments` / `replies` — incoming comments/DMs and their drafted/approved replies (Phase 3). Nothing
-  writes to these tables yet.
+- `comments` / `replies` — incoming comments/DMs (facebook/instagram only — TikTok is explicitly out
+  of scope, see below) and their drafted/approved replies (Phase 3, in use — see below).
 
 RLS is enabled on all four tables with **no policies** — default-deny as a defense-in-depth backstop,
 since the service-role client bypasses RLS entirely and nothing else should ever be querying these
@@ -181,6 +182,61 @@ configured under App Dashboard > Instagram > API setup with Instagram login > Bu
 separate from the Facebook app's Login settings), and make sure the signed-in Meta/TikTok account is
 added as a Page admin / app tester so development-mode OAuth succeeds.
 
+### Comments + replies (Phase 3, done — Facebook + Instagram only)
+
+**TikTok is explicitly out of scope for this phase** — its public API doesn't reliably expose comment
+webhooks or reply access to third-party apps, unlike Meta. Revisit only if TikTok grants the right
+scopes during app review.
+
+`app/src/lib/comments.ts` — `Comment`/`Reply`/`CommentWithReply` types + `listActiveComments()`
+(excludes `replied`/`ignored`), `getCommentById()`, `upsertIncomingComment()` (upsert on
+`platform,platform_comment_id` with `ignoreDuplicates: true` — Meta redelivers webhooks on any
+non-200/slow response, must not clobber status). `draftReplyContent()` in `generate.ts` is the reply
+sibling of `draftPostContent()`, same OpenAI/Gemini provider routing.
+
+Webhooks: `app/src/app/api/webhooks/{meta,instagram}/route.ts`, both public (see `proxy.ts`'s
+`api/webhooks` exemption) since Meta's servers hit them with no session. `GET` answers Meta's
+`hub.challenge` verification handshake against `META_WEBHOOK_VERIFY_TOKEN`/
+`INSTAGRAM_WEBHOOK_VERIFY_TOKEN`. `POST` verifies `X-Hub-Signature-256` over the **raw** body (via
+`app/src/lib/webhook-signature.ts`'s `verifyMetaSignature()`, HMAC-SHA256 keyed by `META_APP_SECRET`/
+`INSTAGRAM_APP_SECRET` — the same app secrets already used for OAuth, no new secret needed) before
+`JSON.parse`, then upserts each Page-feed/IG comment (`entry[].changes[]`) and each Messenger/IG DM
+(`entry[].messaging[]`) into `comments`, per-entry try/catch so one bad entry doesn't drop the batch.
+Always returns `200` fast — Meta disables subscriptions that repeatedly time out or error.
+
+Each connected Page/IG account must individually call `/{id}/subscribed_apps` after connecting (app-
+level webhook config alone isn't enough) — wired into `meta/callback/route.ts` and
+`instagram/callback/route.ts` right after `upsertConnection`, non-fatal if it fails.
+
+**OAuth scopes expanded for Phase 3**: `META_OAUTH_SCOPES` gained `pages_manage_engagement` (read/
+reply to Page comments) and `pages_messaging` (Messenger Send API); `INSTAGRAM_OAUTH_SCOPES` gained
+`instagram_business_manage_comments` and `instagram_business_manage_messages`. **Any account connected
+before this change has a token without these scopes and must be disconnected/reconnected** via
+`/connections` before replies will work — this also re-triggers the `subscribed_apps` call.
+
+Replying: `app/src/lib/repliers/{facebook,instagram}.ts`, `sendReply(connection, comment, text)`,
+branching on `comment.message_type`. Facebook comment replies use the publisher's body-param
+`access_token` convention; Facebook DMs go through the Messenger Send API
+(`POST /me/messages?access_token=...`, query-param auth — the one place this deviates from the
+body-param convention, matches Meta's own Send API docs). Instagram replies (comment and DM) both use
+`Authorization: Bearer`, matching the Instagram publisher.
+
+UI: `/comments` (`app/src/app/comments/`), same card-list pattern as the dashboard. Per comment:
+"Generate reply" (AI draft, only if none exists) → editable draft + "Save edit" → "Approve"/"Reject"
+(only while `reply.status === "draft"`) → "Send" (only while `reply.status === "approved"`).
+Approve-then-send only — **no auto-reply**, this is a settled product decision, don't wire one up.
+
+**Manual setup only the account owner can do**, same category as Phase 2's OAuth redirect URIs:
+generate and set `META_WEBHOOK_VERIFY_TOKEN`/`INSTAGRAM_WEBHOOK_VERIFY_TOKEN`; once deployed, configure
+the Webhooks product on each Meta app pointing at `https://<deployed-host>/api/webhooks/{meta,instagram}`
+with those verify tokens, confirm the challenge goes green; then reconnect Facebook/Instagram from
+`/connections` (new scopes). **Not yet done** — nothing is deployed yet (see Deployment below), so
+webhooks aren't registered with Meta and have only been exercised locally with hand-crafted, correctly-
+signed curl payloads (confirmed: GET challenge, POST signature verification pass/fail, and all three
+payload-parsing branches — Facebook comment, Facebook DM, Instagram comment — correctly upsert into
+`comments`). Real Meta traffic, and the repliers' actual `sendReply` calls, are unverified until after
+deployment + reconnecting with the new scopes.
+
 ### Deployment
 
 Not deployed anywhere yet. `.claude/launch.json` (both at this repo's root and inside `app/`) has a
@@ -198,8 +254,11 @@ which subdirectory's `launch.json` you'd expect it to use.
    publisher implemented (see "Connections + publishing" above). **Not yet live-tested** — needs the
    owner to register redirect URIs on Meta's/TikTok's own developer dashboards first (see "Manual
    setup" note above), then actually connect an account and schedule a post through to publish.
-4. Comment/DM monitoring with approve-then-send replies (Phase 3) — webhook subscriptions, populate
-   `comments`/`replies`
+4. ~~Comment/DM monitoring with approve-then-send replies (Phase 3, Facebook + Instagram only)~~ —
+   done, code-complete; webhook signature/challenge verified locally with crafted payloads. **Not yet
+   live-tested** — needs deployment (webhooks require a public HTTPS URL to register with Meta), then
+   registering the webhook subscriptions and reconnecting accounts with the expanded OAuth scopes (see
+   "Comments + replies" above).
 5. Submit for Meta App Review (and TikTok's equivalent) once 1–4 are solid — this is the long pole,
    which is why step 3 starts the registration early rather than waiting
 

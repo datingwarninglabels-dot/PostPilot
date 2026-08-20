@@ -108,6 +108,22 @@ export async function GET(request: NextRequest) {
       expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
     });
 
+    // Phase 3: subscribe this IG account so Meta starts sending comment/DM events —
+    // non-fatal, the connection is still useful for publishing even if this fails.
+    try {
+      const subscribeUrl = new URL(
+        `https://graph.instagram.com/${GRAPH_VERSION}/${userId}/subscribed_apps`
+      );
+      subscribeUrl.searchParams.set("subscribed_fields", "comments,messages");
+      subscribeUrl.searchParams.set("access_token", accessToken);
+      const subscribeRes = await fetch(subscribeUrl, { method: "POST" });
+      if (!subscribeRes.ok) {
+        console.error("Instagram webhook subscription failed:", await subscribeRes.text());
+      }
+    } catch (err) {
+      console.error("Instagram webhook subscription failed:", err);
+    }
+
     return connectionsRedirect(request);
   } catch (err) {
     console.error("Instagram OAuth callback failed:", err);
