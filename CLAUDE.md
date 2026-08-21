@@ -226,24 +226,45 @@ UI: `/comments` (`app/src/app/comments/`), same card-list pattern as the dashboa
 (only while `reply.status === "draft"`) → "Send" (only while `reply.status === "approved"`).
 Approve-then-send only — **no auto-reply**, this is a settled product decision, don't wire one up.
 
-**Manual setup only the account owner can do**, same category as Phase 2's OAuth redirect URIs:
-generate and set `META_WEBHOOK_VERIFY_TOKEN`/`INSTAGRAM_WEBHOOK_VERIFY_TOKEN`; once deployed, configure
-the Webhooks product on each Meta app pointing at `https://<deployed-host>/api/webhooks/{meta,instagram}`
-with those verify tokens, confirm the challenge goes green; then reconnect Facebook/Instagram from
-`/connections` (new scopes). **Not yet done** — nothing is deployed yet (see Deployment below), so
-webhooks aren't registered with Meta and have only been exercised locally with hand-crafted, correctly-
-signed curl payloads (confirmed: GET challenge, POST signature verification pass/fail, and all three
-payload-parsing branches — Facebook comment, Facebook DM, Instagram comment — correctly upsert into
-`comments`). Real Meta traffic, and the repliers' actual `sendReply` calls, are unverified until after
-deployment + reconnecting with the new scopes.
+**Manual setup only the account owner can do**, same category as Phase 2's OAuth redirect URIs — now
+that the app is deployed (see Deployment below), the last two steps are outstanding: configure the
+Webhooks product on each Meta app (App Dashboard → Webhooks) pointing at
+`https://postpilot-taupe-gamma.vercel.app/api/webhooks/{meta,instagram}` using
+`META_WEBHOOK_VERIFY_TOKEN`/`INSTAGRAM_WEBHOOK_VERIFY_TOKEN` (values are in Vercel's env vars, not
+committed anywhere), confirm the challenge goes green; then reconnect Facebook/Instagram from
+`/connections` (new scopes — the old localhost-era connections, if any, don't carry
+`pages_manage_engagement`/`pages_messaging`/`instagram_business_manage_comments`/
+`instagram_business_manage_messages`) — this also needs the **new** redirect URIs
+(`https://postpilot-taupe-gamma.vercel.app/api/auth/{meta,instagram,tiktok}/callback`) added on each
+app's dashboard alongside (or instead of) the old localhost ones. Until both of these are done, webhook
+signature/challenge handling has only been exercised with hand-crafted, correctly-signed curl payloads
+against both localhost and the live deployment (confirmed: GET challenge, POST signature verification
+pass/fail, all three payload-parsing branches). The cron publisher has been hit for real on production
+(`/api/cron/publish` with `CRON_SECRET`) and correctly no-ops/fails per-post when nothing is connected.
+Real Meta traffic, and the repliers' actual `sendReply` calls, remain unverified until the above two
+manual steps are done.
 
 ### Deployment
 
-Not deployed anywhere yet. `.claude/launch.json` (both at this repo's root and inside `app/`) has a
-`social-media-automation-dev` dev-server config on **port 3001** (not 3000) — the sibling
-dating-warning-labels-extracted repo's dev server config already claims 3000 at the session root's
-`.claude/launch.json`, and the preview tooling resolves configs from that root file first regardless of
-which subdirectory's `launch.json` you'd expect it to use.
+**Live on Vercel**, project `postpilot` under the `datingwarninglabels-3664s-projects` team — same
+Vercel account as the sibling dating-warning-labels-extracted app (project `web`), separate project.
+Production URL: `https://postpilot-taupe-gamma.vercel.app` (stable alias — the per-deploy
+`postpilot-<hash>-...vercel.app` URL changes every deploy, don't register that one anywhere external).
+All env vars from `.env.local` are mirrored into Vercel's Production environment (`vercel env ls`) —
+keep them in sync by hand when adding new ones locally, there's no automated sync. `vercel.json` at the
+`app/` root defines the cron trigger for `/api/cron/publish`: **once daily** (`0 13 * * *`, UTC), not
+the originally-planned every-15-minutes — Vercel's Hobby (free) plan only allows daily cron schedules;
+a post scheduled for a specific time may not actually publish until up to ~24h later. Upgrading to
+Vercel Pro ($20/mo) would unlock frequent cron if tighter publish timing is ever needed — that's a
+manual account-owner decision, not something to change unprompted. Vercel automatically sends
+`Authorization: Bearer <value>` using the env var named exactly `CRON_SECRET` for cron-triggered
+requests — no extra wiring needed beyond the env var existing.
+
+Redeploy with `vercel --prod --yes` from `app/`. Local dev is unaffected — `.claude/launch.json` (both
+at this repo's root and inside `app/`) still has a `social-media-automation-dev` dev-server config on
+**port 3001** (not 3000, which the sibling dating-warning-labels-extracted repo's dev server claims at
+the session root's `.claude/launch.json`) for `https://localhost:3001` local testing with the
+self-signed cert.
 
 ## Build order (from the brief)
 
