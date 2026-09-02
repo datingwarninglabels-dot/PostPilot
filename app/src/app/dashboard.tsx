@@ -65,17 +65,18 @@ function PostCard({
 
   const [content, setContent] = useState(post.content);
   const [mediaUrl, setMediaUrl] = useState(post.media_urls[0] ?? "");
+  const [connectionId, setConnectionId] = useState(post.connection_id ?? "");
   const [scheduledAt, setScheduledAt] = useState(
     post.scheduled_at ? post.scheduled_at.slice(0, 16) : ""
   );
 
   const platformConnections = connections.filter((c) => c.platform === post.platform);
-  const targetConnection = platformConnections.find((c) => c.id === post.connection_id) ?? null;
+  const targetConnection = platformConnections.find((c) => c.id === connectionId) ?? null;
 
   const contentDirty = content !== post.content;
   const mediaDirty = mediaUrl !== (post.media_urls[0] ?? "");
   const missingRequiredMedia = MEDIA_REQUIRED[post.platform] && !mediaUrl.trim();
-  const needsAccountChoice = platformConnections.length > 1 && !post.connection_id;
+  const needsAccountChoice = platformConnections.length > 1 && !connectionId;
   const noAccountConnected = platformConnections.length === 0;
   const editable = post.status !== "published" && post.status !== "submitted";
   const canApprove =
@@ -173,13 +174,15 @@ function PostCard({
             ) : (
               <select
                 id={`account-${post.id}`}
-                value={post.connection_id ?? ""}
+                value={connectionId}
                 disabled={pending}
-                onChange={(e) =>
-                  run(() => setPostConnectionAction(post.id, e.target.value || null), {
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setConnectionId(next);
+                  run(() => setPostConnectionAction(post.id, next || null), {
                     onSuccess: refresh,
-                  })
-                }
+                  });
+                }}
                 className={inputBase}
               >
                 <option value="">Choose an account…</option>
