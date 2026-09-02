@@ -1,21 +1,25 @@
-import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { listActiveComments } from "@/lib/comments";
+import { AppHeader } from "@/components/app-header";
 import { CommentsList } from "./comments-list";
+
+export const metadata = { title: "Comments" };
 
 export default async function CommentsPage() {
   await requireAdmin();
   const comments = await listActiveComments();
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Comments</h1>
-        <Link href="/" className="text-sm text-neutral-500 hover:underline">
-          ← Back to dashboard
-        </Link>
-      </div>
-      <CommentsList comments={comments} />
-    </div>
+    <>
+      <AppHeader active="/comments" />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+        <h1 className="mb-1 text-lg font-semibold">Comments &amp; DMs</h1>
+        <p className="mb-6 text-sm text-neutral-500">
+          Incoming comments and messages from Facebook and Instagram. Draft a reply, edit it,
+          approve it — then send. Nothing is sent automatically.
+        </p>
+        <CommentsList comments={comments} />
+      </main>
+    </>
   );
 }

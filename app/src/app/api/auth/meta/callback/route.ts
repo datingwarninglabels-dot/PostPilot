@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { upsertConnection } from "@/lib/platform-connections";
+import { logActivity } from "@/lib/activity";
 
 const GRAPH_VERSION = "v21.0";
 
@@ -94,6 +95,16 @@ export async function GET(request: NextRequest) {
         accountName: page.name,
         accountId: page.id,
         accessToken: page.access_token,
+      });
+
+      await logActivity({
+        actor: "oauth:meta",
+        eventType: "connection_added",
+        entityType: "connection",
+        platform: "facebook",
+        accountName: page.name,
+        status: "success",
+        summary: `Connected Facebook Page: ${page.name}`,
       });
 
       // Phase 3: app-level webhook config alone isn't enough — each Page must

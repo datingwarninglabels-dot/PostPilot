@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase-admin";
+import { logActivity } from "./activity";
 import type { Platform } from "./posts";
 
 export type MessageType = "comment" | "dm";
@@ -73,7 +74,7 @@ export async function upsertIncomingComment(input: {
   body: string;
   receivedAt?: string;
 }): Promise<void> {
-  const { error } = await getSupabaseAdmin()
+  const { data, error } = await getSupabaseAdmin()
     .from("comments")
     .upsert(
       {
@@ -87,7 +88,25 @@ export async function upsertIncomingComment(input: {
         received_at: input.receivedAt ?? new Date().toISOString(),
       },
       { onConflict: "platform,platform_comment_id", ignoreDuplicates: true }
-    );
+    )
+    .select("id");
 
   if (error) throw error;
+
+  // `ignoreDuplicates` means a redelivery returns no row — only log genuinely new ones.
+  const inserted = data?.[0];
+  if (inserted) {
+    await logActivity({
+      actor: "system:webhook",
+      eventType: "comment_received",
+      entityType: "comment",
+      entityId: inserted.id,
+      platform: input.platform,
+      status: "info",
+      summary: `New ${input.platform} ${input.messageType} from ${
+        input.authorName ?? "someone"
+      }`,
+      detail: { body: input.body.slice(0, 500) },
+    });
+  }
 }

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { upsertConnection } from "@/lib/platform-connections";
+import { logActivity } from "@/lib/activity";
 
 const GRAPH_VERSION = "v21.0";
 
@@ -106,6 +107,16 @@ export async function GET(request: NextRequest) {
       accountId: userId,
       accessToken,
       expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
+    });
+
+    await logActivity({
+      actor: "oauth:instagram",
+      eventType: "connection_added",
+      entityType: "connection",
+      platform: "instagram",
+      accountName: username ?? userId,
+      status: "success",
+      summary: `Connected Instagram account: ${username ?? userId}`,
     });
 
     // Phase 3: subscribe this IG account so Meta starts sending comment/DM events —

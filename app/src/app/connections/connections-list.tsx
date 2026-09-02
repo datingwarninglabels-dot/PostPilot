@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { PlatformConnection } from "@/lib/platform-connections";
+import type { PlatformConnectionWithHealth } from "@/lib/platform-connections";
+import { useActionRunner } from "@/components/toast";
 import { disconnectConnectionAction } from "../actions";
 
 const PLATFORMS: {
-  key: PlatformConnection["platform"];
+  key: PlatformConnectionWithHealth["platform"];
   label: string;
   startRoute: string;
   note?: string;
@@ -17,47 +17,54 @@ const PLATFORMS: {
     key: "tiktok",
     label: "TikTok",
     startRoute: "tiktok",
-    note: "This app hasn't been through TikTok's audit, so published videos are only visible to the connected account (SELF_ONLY), not the public.",
+    note: "This app hasn't been through TikTok's review yet, so posts publish as SELF_ONLY — visible only to the connected account, not the public.",
   },
 ];
 
-export function ConnectionsList({ connections }: { connections: PlatformConnection[] }) {
-  const router = useRouter();
-  const [busyId, setBusyId] = useState<string | null>(null);
+const HEALTH_BADGE: Record<PlatformConnectionWithHealth["health"], string> = {
+  ok: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  expiring: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  expired: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+};
 
-  async function handleDisconnect(id: string) {
-    setBusyId(id);
-    try {
-      await disconnectConnectionAction(id);
-      router.refresh();
-    } finally {
-      setBusyId(null);
-    }
-  }
+function healthText(c: PlatformConnectionWithHealth): string {
+  if (c.health === "expired") return "Token expired — reconnect";
+  if (c.health === "expiring") return `Token expires in ${c.expires_in_days}d`;
+  return c.expires_at ? "Token valid" : "No expiry";
+}
+
+export function ConnectionsList({
+  connections,
+}: {
+  connections: PlatformConnectionWithHealth[];
+}) {
+  const router = useRouter();
+  const { pending, run } = useActionRunner();
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {PLATFORMS.map(({ key, label, startRoute, note }) => {
         const platformConnections = connections.filter((c) => c.platform === key);
         return (
-          <div key={key} className="rounded border border-black/10 p-4 dark:border-white/10">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-medium capitalize">{label}</h2>
+          <section
+            key={key}
+            className="rounded-lg border border-black/10 p-4 dark:border-white/10"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="font-semibold">{label}</h2>
               <button
                 type="button"
                 onClick={() => {
-                  // Not an internal page — a Route Handler that 307s to an
-                  // external OAuth provider, so a real navigation is correct
-                  // here (and, unlike a plain <a href>, only fires on an
-                  // actual click — browsers speculatively prefetch <a> links
-                  // on hover, which was silently consuming the state cookie
-                  // before the user ever clicked).
-                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-                  window.location.href = `/api/auth/${startRoute}/start`;
+                  // A Route Handler that 307s to an external OAuth provider — a real
+                  // navigation, and only on an actual click (browsers prefetch <a> on
+                  // hover, which was consuming the state cookie before the click).
+                  window.location.assign(
+                    new URL(`/api/auth/${startRoute}/start`, window.location.origin).toString()
+                  );
                 }}
-                className="rounded border border-black/15 px-3 py-1.5 text-sm dark:border-white/15"
+                className="inline-flex min-h-9 items-center rounded-md border border-black/15 px-3 py-1.5 text-sm transition-colors hover:bg-black/[0.03] dark:border-white/15 dark:hover:bg-white/[0.05]"
               >
-                Connect {label}
+                {platformConnections.length > 0 ? `Reconnect ${label}` : `Connect ${label}`}
               </button>
             </div>
             {note && <p className="mb-3 text-xs text-neutral-500">{note}</p>}
@@ -68,14 +75,23 @@ export function ConnectionsList({ connections }: { connections: PlatformConnecti
                 {platformConnections.map((c) => (
                   <li
                     key={c.id}
-                    className="flex items-center justify-between rounded bg-black/5 px-3 py-2 text-sm dark:bg-white/10"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-black/5 px-3 py-2 text-sm dark:bg-white/10"
                   >
-                    <span>{c.account_name}</span>
+                    <span className="font-medium">{c.account_name}</span>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-xs font-medium ${HEALTH_BADGE[c.health]}`}
+                    >
+                      {healthText(c)}
+                    </span>
                     <button
                       type="button"
-                      disabled={busyId === c.id}
-                      onClick={() => handleDisconnect(c.id)}
-                      className="text-xs text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                      disabled={pending}
+                      onClick={() =>
+                        run(() => disconnectConnectionAction(c.id), {
+                          onSuccess: () => router.refresh(),
+                        })
+                      }
+                      className="ml-auto text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
                     >
                       Disconnect
                     </button>
@@ -83,7 +99,7 @@ export function ConnectionsList({ connections }: { connections: PlatformConnecti
                 ))}
               </ul>
             )}
-          </div>
+          </section>
         );
       })}
     </div>

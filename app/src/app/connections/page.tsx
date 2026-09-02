@@ -1,7 +1,9 @@
-import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { listConnections } from "@/lib/platform-connections";
+import { listConnectionsWithHealth } from "@/lib/platform-connections";
+import { AppHeader } from "@/components/app-header";
 import { ConnectionsList } from "./connections-list";
+
+export const metadata = { title: "Connections" };
 
 export default async function ConnectionsPage({
   searchParams,
@@ -9,27 +11,28 @@ export default async function ConnectionsPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   await requireAdmin();
-  const [connections, { error }] = await Promise.all([listConnections(), searchParams]);
+  const [connections, { error }] = await Promise.all([
+    listConnectionsWithHealth(),
+    searchParams,
+  ]);
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Connections</h1>
-        <div className="flex items-center gap-4">
-          <Link href="/comments" className="text-sm text-neutral-500 hover:underline">
-            Comments
-          </Link>
-          <Link href="/" className="text-sm text-neutral-500 hover:underline">
-            ← Back to dashboard
-          </Link>
-        </div>
-      </div>
-      {error && (
-        <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-          Connection failed: {error}
-        </div>
-      )}
-      <ConnectionsList connections={connections} />
-    </div>
+    <>
+      <AppHeader active="/connections" />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+        <h1 className="mb-1 text-lg font-semibold">Connected accounts</h1>
+        <p className="mb-6 text-sm text-neutral-500">
+          The Facebook Pages, Instagram accounts, and TikTok profiles PostPilot can publish to and
+          read comments from. Reconnect an account to refresh an expiring token or add new
+          permissions.
+        </p>
+        {error && (
+          <div className="mb-4 rounded-md border border-red-600/30 bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+            Connection failed: {error}
+          </div>
+        )}
+        <ConnectionsList connections={connections} />
+      </main>
+    </>
   );
 }

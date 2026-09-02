@@ -63,8 +63,19 @@ do that whenever `supabase db pull`/`link` gets set up) defines:
 
 - `posts` — `platform` (facebook/instagram/tiktok), `post_type`, `source_product_description` (the
   input used to generate the draft), `content`, `media_urls`, `status`
-  (draft/approved/rejected/scheduled/published/failed), `scheduled_at`, `published_at`,
-  `platform_post_id`, `error_message`.
+  (draft/approved/rejected/scheduled/**submitted**/published/failed), `scheduled_at`, `published_at`,
+  `platform_post_id`, `error_message`, **`connection_id`** (FK → `platform_connections`, `ON DELETE
+  SET NULL` — which connected account this post publishes to; required before approve when the
+  platform has >1 account connected). `submitted` = a TikTok post accepted by the Content Posting
+  API for async processing but not yet confirmed live (the app still doesn't poll status).
+- `activity_log` — append-only audit trail (`app/src/lib/activity.ts`). Every draft / edit /
+  approval / schedule / publish attempt / reply / connection change writes one row
+  (`event_type`, `entity_type`, `entity_id`, `platform`, `account_name` denormalised, `status`
+  success/failure/info, `summary`, `detail` jsonb, `target_platform_id`, `actor` — admin email or
+  `system:cron`/`system:webhook`/`oauth:*`). Never updated or deleted. Surfaced at `/activity`
+  (filter by platform/type/result/search, paginated) with CSV export at `/api/activity/export`.
+  `logActivity()` is best-effort — it logs to the server console and returns on failure rather
+  than breaking the action.
 - `platform_connections` — OAuth tokens per connected account (Phase 2, in use — see below).
   `access_token_encrypted`/`refresh_token_encrypted` are named to force the point: encrypt at the
   application layer with a server-side secret before insert — this column is ciphertext, not a raw
@@ -96,14 +107,28 @@ drafting, fully testable today with just `OPENAI_API_KEY` and Supabase configure
 
 ### Dashboard (Phase 1, done)
 
-`app/src/app/page.tsx` (the root route, gated) fetches non-published/non-rejected posts via
-`listActivePosts()` (`app/src/lib/posts.ts`) and renders `app/src/app/dashboard.tsx` — a client
-component listing each post as a card: editable content, Approve/Reject for drafts, and a
-datetime-local scheduler for approved posts. All mutations are Server Actions in `app/src/app/
-actions.ts` (`updatePostContentAction`, `approvePostAction`, `rejectPostAction`,
-`schedulePostAction`/`unschedulePostAction`), each re-running `requireAdmin()` before touching the
-service-role client — Server Actions are callable directly, so the proxy-level gate alone isn't
-sufficient there either.
+`app/src/app/page.tsx` (the root route, gated) renders a "This morning" attention summary (pending
+approvals, failed posts, comments/DMs awaiting reply, expiring/expired connection tokens) above
+`app/src/app/dashboard.tsx` — a client component listing each active post as a card: editable
+content, a media-URL field, a **target-account picker** (`setPostConnectionAction`), Approve/Reject
+for drafts, a datetime-local scheduler + **Publish now** (`publishPostNowAction`) for approved posts,
+and, on `failed` posts, the `error_message` inline plus a **Retry publish** button. All mutations
+are Server Actions in `app/src/app/actions.ts`, each re-running `requireAdmin()` first.
+
+**Server Actions return `ActionResult` (`{ ok: true, message? } | { ok: false, error }`), never
+throw for expected failures** (`app/src/lib/action-result.ts`). The client wraps every call in
+`useActionRunner()` (`app/src/components/toast.tsx`) which shows a success/error toast — so a failed
+publish or send is always visible, never silent. `toUserMessage()` maps rate-limit/quota/expired-
+token errors to plain guidance.
+
+Shared nav is `app/src/components/app-header.tsx` (Drafts / Comments / Activity / Connections).
+
+Publishing a single post — resolve target account, call the platform API, write status back, log a
+`post_publish_attempt` either way — lives in `app/src/lib/publish.ts` (`publishPost`), shared by the
+cron route and `publishPostNowAction` so both behave and log identically. It never throws; a failure
+leaves the post `failed` with `error_message` set. `resolvePostConnection()`
+(`platform-connections.ts`) picks `post.connection_id`, falling back to the oldest connection for the
+platform (logged as a fallback) — the old code picked an arbitrary row, wrong with multiple Pages.
 
 ### Connections + publishing (Phase 2, done)
 
@@ -155,9 +180,11 @@ to the connected account, not the public) regardless of what's requested.
 
 `app/src/app/api/cron/publish/route.ts` is the scheduler: `GET` with
 `Authorization: Bearer $CRON_SECRET` (the header Vercel Cron sends) selects `posts` where
-`status = 'scheduled' AND scheduled_at <= now()`, publishes each via the matching connection, and sets
-`published`/`platform_post_id` or `failed`/`error_message`. Not wired to an actual cron trigger yet —
-nothing is deployed (see below), so for now this only runs when hit manually.
+`status = 'scheduled' AND scheduled_at <= now()` and calls `publishPost` (`app/src/lib/publish.ts`)
+for each — same shared path as the dashboard's "Publish now". Sets `published`/`submitted` +
+`platform_post_id` + `connection_id`, or `failed` + `error_message`, and writes a per-post
+`post_publish_attempt` row plus one batch-summary row to `activity_log`. Wired to a daily Vercel
+Cron trigger (see Deployment).
 
 **The dev server runs over HTTPS, not HTTP.** Instagram's "Instagram API with Instagram Login" product
 flat-out rejects `http://` redirect URIs at save time (Facebook Pages and TikTok accept either) —
@@ -223,8 +250,11 @@ body-param convention, matches Meta's own Send API docs). Instagram replies (com
 
 UI: `/comments` (`app/src/app/comments/`), same card-list pattern as the dashboard. Per comment:
 "Generate reply" (AI draft, only if none exists) → editable draft + "Save edit" → "Approve"/"Reject"
-(only while `reply.status === "draft"`) → "Send" (only while `reply.status === "approved"`).
-Approve-then-send only — **no auto-reply**, this is a settled product decision, don't wire one up.
+(only while `reply.status === "draft"`) → "Approve & send on {platform}" (only while
+`reply.status === "approved"`). Every step returns an `ActionResult` and shows a toast; sends log a
+`reply_send_attempt` row (success or failure) so a failed send is visible and recorded, never
+silent. Approve-then-send only — **no auto-reply**, this is a settled product decision, don't wire
+one up.
 
 **Manual setup only the account owner can do**, same category as Phase 2's OAuth redirect URIs — now
 that the app is deployed (see Deployment below), the last two steps are outstanding: configure the

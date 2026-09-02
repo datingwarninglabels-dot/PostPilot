@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { upsertConnection } from "@/lib/platform-connections";
+import { logActivity } from "@/lib/activity";
 
 function connectionsRedirect(request: NextRequest, error?: string): NextResponse {
   const url = new URL("/connections", request.url);
@@ -92,6 +93,16 @@ export async function GET(request: NextRequest) {
       accessToken,
       refreshToken,
       expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
+    });
+
+    await logActivity({
+      actor: "oauth:tiktok",
+      eventType: "connection_added",
+      entityType: "connection",
+      platform: "tiktok",
+      accountName: displayName ?? openId,
+      status: "success",
+      summary: `Connected TikTok account: ${displayName ?? openId}`,
     });
 
     return connectionsRedirect(request);
