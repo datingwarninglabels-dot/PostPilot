@@ -5,6 +5,7 @@ import {
   listActivityForExport,
   type ActivityFilters,
 } from "@/lib/activity";
+import { getAccountScope } from "@/lib/platform-connections";
 
 /** CSV export of the activity log, honouring the same filters as the /activity page. */
 export async function GET(request: NextRequest) {
@@ -31,6 +32,12 @@ export async function GET(request: NextRequest) {
     eventType: (event as ActivityFilters["eventType"]) || undefined,
     q: q?.trim() || undefined,
   };
+
+  const scope = await getAccountScope(sp.get("account"));
+  if (scope) {
+    filters.accountName = scope.account_name;
+    filters.platform = filters.platform ?? scope.platform;
+  }
 
   const entries = await listActivityForExport(filters);
   const csv = activityToCsv(entries);

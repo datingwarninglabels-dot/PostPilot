@@ -85,6 +85,17 @@ export async function upsertConnection(input: {
   if (error) throw error;
 }
 
+export type AccountScope = { id: string; platform: Platform; account_name: string };
+
+/** Resolves the `?account=<id>` filter param used by the header's account switcher. */
+export async function getAccountScope(
+  connectionId: string | null | undefined
+): Promise<AccountScope | null> {
+  if (!connectionId) return null;
+  const c = await getConnection(connectionId);
+  return c ? { id: c.id, platform: c.platform, account_name: c.account_name } : null;
+}
+
 export async function getConnection(id: string): Promise<PlatformConnection | null> {
   const { data, error } = await getSupabaseAdmin()
     .from("platform_connections")

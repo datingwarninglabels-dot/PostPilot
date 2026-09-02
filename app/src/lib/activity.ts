@@ -89,6 +89,7 @@ export type ActivityFilters = {
   eventType?: ActivityEventType;
   status?: ActivityStatus;
   entityType?: ActivityEntityType;
+  accountName?: string;
   q?: string;
 };
 
@@ -107,6 +108,7 @@ function applyFilters(query: FilterableQuery, filters: ActivityFilters): Filtera
   if (filters.eventType) q = q.eq("event_type", filters.eventType);
   if (filters.status) q = q.eq("status", filters.status);
   if (filters.entityType) q = q.eq("entity_type", filters.entityType);
+  if (filters.accountName) q = q.eq("account_name", filters.accountName);
   if (filters.q) {
     const safe = filters.q.replace(/[%,()*]/g, " ").trim();
     if (safe) q = q.or(`summary.ilike.%${safe}%,account_name.ilike.%${safe}%`);

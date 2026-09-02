@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import type { PlatformConnectionWithHealth } from "@/lib/platform-connections";
+import { CONNECTION_HEALTH } from "@/lib/status-display";
 import { useActionRunner } from "@/components/toast";
+import { Badge, Button, Card } from "@/components/ui";
 import { disconnectConnectionAction } from "../actions";
 
 const PLATFORMS: {
@@ -20,12 +22,6 @@ const PLATFORMS: {
     note: "This app hasn't been through TikTok's review yet, so posts publish as SELF_ONLY — visible only to the connected account, not the public.",
   },
 ];
-
-const HEALTH_BADGE: Record<PlatformConnectionWithHealth["health"], string> = {
-  ok: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  expiring: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-  expired: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-};
 
 function healthText(c: PlatformConnectionWithHealth): string {
   if (c.health === "expired") return "Token expired — reconnect";
@@ -46,14 +42,10 @@ export function ConnectionsList({
       {PLATFORMS.map(({ key, label, startRoute, note }) => {
         const platformConnections = connections.filter((c) => c.platform === key);
         return (
-          <section
-            key={key}
-            className="rounded-lg border border-black/10 p-4 dark:border-white/10"
-          >
+          <Card key={key} className="p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="font-semibold">{label}</h2>
-              <button
-                type="button"
+              <Button
                 onClick={() => {
                   // A Route Handler that 307s to an external OAuth provider — a real
                   // navigation, and only on an actual click (browsers prefetch <a> on
@@ -62,27 +54,22 @@ export function ConnectionsList({
                     new URL(`/api/auth/${startRoute}/start`, window.location.origin).toString()
                   );
                 }}
-                className="inline-flex min-h-9 items-center rounded-md border border-black/15 px-3 py-1.5 text-sm transition-colors hover:bg-black/[0.03] dark:border-white/15 dark:hover:bg-white/[0.05]"
               >
                 {platformConnections.length > 0 ? `Reconnect ${label}` : `Connect ${label}`}
-              </button>
+              </Button>
             </div>
-            {note && <p className="mb-3 text-xs text-neutral-500">{note}</p>}
+            {note && <p className="mb-3 text-xs text-muted">{note}</p>}
             {platformConnections.length === 0 ? (
-              <p className="text-sm text-neutral-500">Not connected.</p>
+              <p className="text-sm text-muted">Not connected.</p>
             ) : (
               <ul className="flex flex-col gap-2">
                 {platformConnections.map((c) => (
                   <li
                     key={c.id}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-black/5 px-3 py-2 text-sm dark:bg-white/10"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-control bg-black/[0.04] px-3 py-2 text-sm dark:bg-white/[0.06]"
                   >
                     <span className="font-medium">{c.account_name}</span>
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs font-medium ${HEALTH_BADGE[c.health]}`}
-                    >
-                      {healthText(c)}
-                    </span>
+                    <Badge tone={CONNECTION_HEALTH[c.health].tone}>{healthText(c)}</Badge>
                     <button
                       type="button"
                       disabled={pending}
@@ -91,7 +78,7 @@ export function ConnectionsList({
                           onSuccess: () => router.refresh(),
                         })
                       }
-                      className="ml-auto text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                      className="ml-auto text-xs font-medium text-danger hover:underline disabled:opacity-50"
                     >
                       Disconnect
                     </button>
@@ -99,7 +86,7 @@ export function ConnectionsList({
                 ))}
               </ul>
             )}
-          </section>
+          </Card>
         );
       })}
     </div>

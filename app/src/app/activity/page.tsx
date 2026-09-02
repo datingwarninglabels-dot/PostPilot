@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import {
-  listActivity,
-  type ActivityFilters,
-  type ActivityLogEntry,
-} from "@/lib/activity";
+import { listActivity, type ActivityFilters } from "@/lib/activity";
+import { getAccountScope } from "@/lib/platform-connections";
 import { AppHeader } from "@/components/app-header";
+import { Badge } from "@/components/ui";
+import { ACTIVITY_STATUS } from "@/lib/status-display";
 
 export const metadata = { title: "Activity" };
 
@@ -29,12 +28,6 @@ const EVENT_LABELS: Record<string, string> = {
   comment_received: "Comment received",
   connection_added: "Account connected",
   connection_removed: "Account disconnected",
-};
-
-const STATUS_STYLE: Record<ActivityLogEntry["status"], string> = {
-  success: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  failure: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-  info: "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
 };
 
 function firstParam(v: string | string[] | undefined): string | undefined {
@@ -82,7 +75,13 @@ export default async function ActivityPage({
 }) {
   await requireAdmin();
   const sp = await searchParams;
+  const account = firstParam(sp.account);
+  const scope = await getAccountScope(account);
   const filters = parseFilters(sp);
+  if (scope) {
+    filters.accountName = scope.account_name;
+    filters.platform = filters.platform ?? scope.platform;
+  }
   const page = Math.max(0, Number.parseInt(firstParam(sp.page) ?? "0", 10) || 0);
 
   const { entries, total } = await listActivity(filters, {
@@ -92,11 +91,12 @@ export default async function ActivityPage({
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const baseParams = {
-    platform: filters.platform,
+    platform: scope ? undefined : filters.platform,
     status: filters.status,
     entity: filters.entityType,
     event: filters.eventType,
     q: filters.q,
+    account: scope?.id,
   };
 
   const select =
@@ -115,16 +115,17 @@ export default async function ActivityPage({
             Export CSV
           </a>
         </div>
-        <p className="mb-5 text-sm text-neutral-500">
+        <p className="mb-5 text-sm text-muted">
           Every draft, edit, approval, publish attempt, and reply — across all connected accounts.
           Append-only; {total.toLocaleString()} event{total === 1 ? "" : "s"} recorded.
         </p>
 
         <form
           method="GET"
-          className="mb-5 flex flex-wrap items-end gap-2 rounded-lg border border-black/10 p-3 dark:border-white/10"
+          className="mb-5 flex flex-wrap items-end gap-2 rounded-card border border-border p-3"
         >
-          <label className="flex flex-col gap-1 text-xs font-medium text-neutral-500">
+          {scope && <input type="hidden" name="account" value={scope.id} />}
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted">
             Platform
             <select name="platform" defaultValue={filters.platform ?? ""} className={select}>
               <option value="">Any</option>
@@ -133,7 +134,7 @@ export default async function ActivityPage({
               <option value="tiktok">TikTok</option>
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-neutral-500">
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted">
             Type
             <select name="entity" defaultValue={filters.entityType ?? ""} className={select}>
               <option value="">Any</option>
@@ -143,7 +144,7 @@ export default async function ActivityPage({
               <option value="connection">Connections</option>
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-neutral-500">
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted">
             Result
             <select name="status" defaultValue={filters.status ?? ""} className={select}>
               <option value="">Any</option>
@@ -152,7 +153,7 @@ export default async function ActivityPage({
               <option value="info">Info</option>
             </select>
           </label>
-          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-neutral-500">
+          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-muted">
             Search
             <input
               type="search"
@@ -170,7 +171,7 @@ export default async function ActivityPage({
           </button>
           <Link
             href="/activity"
-            className="inline-flex min-h-9 items-center rounded-md px-2 py-1.5 text-sm text-neutral-500 hover:text-foreground"
+            className="inline-flex min-h-9 items-center rounded-md px-2 py-1.5 text-sm text-muted hover:text-foreground"
           >
             Clear
           </Link>
@@ -178,7 +179,7 @@ export default async function ActivityPage({
 
         {entries.length === 0 ? (
           <div className="rounded-lg border border-dashed border-black/15 p-8 text-center dark:border-white/15">
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-muted">
               No activity matches these filters yet.
             </p>
           </div>
@@ -186,7 +187,7 @@ export default async function ActivityPage({
           <div className="overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
             <table className="w-full min-w-[720px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-neutral-500 dark:border-white/10">
+                <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-muted dark:border-white/10">
                   <th className="px-3 py-2 font-medium">When</th>
                   <th className="px-3 py-2 font-medium">Event</th>
                   <th className="px-3 py-2 font-medium">Account</th>
@@ -200,36 +201,32 @@ export default async function ActivityPage({
                     key={e.id}
                     className="border-b border-black/5 align-top last:border-0 dark:border-white/5"
                   >
-                    <td className="whitespace-nowrap px-3 py-2 text-neutral-500">
+                    <td className="whitespace-nowrap px-3 py-2 text-muted">
                       {new Date(e.created_at).toLocaleString()}
                     </td>
                     <td className="px-3 py-2">
                       <span className="font-medium">
                         {EVENT_LABELS[e.event_type] ?? e.event_type}
                       </span>
-                      <span className="block text-xs text-neutral-500">
+                      <span className="block text-xs text-muted">
                         {e.actor ?? "—"}
                         {e.platform ? ` · ${e.platform}` : ""}
                       </span>
                     </td>
                     <td className="px-3 py-2">{e.account_name ?? "—"}</td>
                     <td className="px-3 py-2">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-xs font-medium ${STATUS_STYLE[e.status]}`}
-                      >
-                        {e.status}
-                      </span>
+                      <Badge tone={ACTIVITY_STATUS[e.status]}>{e.status}</Badge>
                     </td>
                     <td className="px-3 py-2">
                       <span>{e.summary ?? "—"}</span>
                       {e.target_platform_id && (
-                        <span className="block text-xs text-neutral-500">
+                        <span className="block text-xs text-muted">
                           id: {e.target_platform_id}
                         </span>
                       )}
                       {e.detail && Object.keys(e.detail).length > 0 && (
                         <details className="mt-1">
-                          <summary className="cursor-pointer text-xs text-neutral-500">
+                          <summary className="cursor-pointer text-xs text-muted">
                             more
                           </summary>
                           <pre className="mt-1 max-w-md overflow-x-auto rounded bg-black/5 p-2 text-xs dark:bg-white/5">
@@ -247,7 +244,7 @@ export default async function ActivityPage({
 
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between text-sm">
-            <span className="text-neutral-500">
+            <span className="text-muted">
               Page {page + 1} of {totalPages}
             </span>
             <div className="flex gap-2">

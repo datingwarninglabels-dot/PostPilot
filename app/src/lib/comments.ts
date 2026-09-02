@@ -34,17 +34,40 @@ export type Reply = {
 export type CommentWithReply = Comment & { reply: Reply | null };
 
 /** Inbox view — everything not yet terminal (replied/ignored), newest first. */
-export async function listActiveComments(): Promise<CommentWithReply[]> {
-  const { data, error } = await getSupabaseAdmin()
+export async function listActiveComments(opts?: {
+  platform?: Platform;
+}): Promise<CommentWithReply[]> {
+  let query = getSupabaseAdmin()
     .from("comments")
     .select("*, replies(*)")
-    .not("status", "in", "(replied,ignored)")
-    .order("received_at", { ascending: false });
+    .not("status", "in", "(replied,ignored)");
+  if (opts?.platform) query = query.eq("platform", opts.platform);
 
+  const { data, error } = await query.order("received_at", { ascending: false });
   if (error) throw error;
   return (data as (Comment & { replies: Reply[] })[]).map(({ replies, ...comment }) => ({
     ...comment,
     reply: replies?.[0] ?? null,
+  }));
+}
+
+export type SentReply = Reply & { comment: Comment | null };
+
+/** The "what went out" feed for replies — sent replies with their source comment. */
+export async function listSentReplies(
+  limit = 60,
+  opts?: { platform?: Platform }
+): Promise<SentReply[]> {
+  const embed = opts?.platform ? "comments!inner(*)" : "comments(*)";
+  let query = getSupabaseAdmin().from("replies").select(`*, ${embed}`).eq("status", "sent");
+  if (opts?.platform) query = query.eq("comments.platform", opts.platform);
+
+  const { data, error } = await query.order("sent_at", { ascending: false }).limit(limit);
+
+  if (error) throw error;
+  return (data as (Reply & { comments: Comment | null })[]).map(({ comments, ...reply }) => ({
+    ...reply,
+    comment: comments,
   }));
 }
 

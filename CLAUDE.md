@@ -121,7 +121,23 @@ throw for expected failures** (`app/src/lib/action-result.ts`). The client wraps
 publish or send is always visible, never silent. `toUserMessage()` maps rate-limit/quota/expired-
 token errors to plain guidance.
 
-Shared nav is `app/src/components/app-header.tsx` (Drafts / Comments / Activity / Connections).
+Shared nav is `app/src/components/app-header.tsx` (Drafts / Comments / History / Activity /
+Connections) — an async Server Component that also renders `AccountSwitcher`
+(`app/src/components/account-switcher.tsx`) when >1 account is connected. The switcher writes
+`?account=<connectionId>`; pages resolve it with `getAccountScope()` and scope their queries — posts
+by `connection_id`, comments/replies/activity by that account's platform (and `account_name` for the
+activity log). When no account is connected the dashboard shows a 3-step first-run guide instead.
+
+`/history` (`app/src/app/history/page.tsx`) is the "what went out" feed — `listSentPosts()` +
+`listSentReplies()`, grouped by day, with a Facebook permalink (`platformPostUrl()`) where the stored
+id maps to one. It's the human-readable companion to `/activity`.
+
+**Design system**: tokens live in `app/src/app/globals.css` (`--card`, `--border`, `--muted`,
+`--primary`, `--radius`…, exposed as Tailwind utilities `bg-card` / `text-muted` / `border-border` /
+`rounded-card` via `@theme inline`). Shared presentational primitives — `Button`, `Card`, `Badge`,
+`EmptyState`, `inputClass` — are in `app/src/components/ui.tsx` (no `"use client"`, usable from
+Server and Client Components). Status → label/tone maps are centralised in
+`app/src/lib/status-display.ts`.
 
 Publishing a single post — resolve target account, call the platform API, write status back, log a
 `post_publish_attempt` either way — lives in `app/src/lib/publish.ts` (`publishPost`), shared by the

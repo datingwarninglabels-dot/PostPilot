@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Post } from "@/lib/posts";
 import type { PlatformConnectionWithHealth } from "@/lib/platform-connections";
+import { POST_STATUS } from "@/lib/status-display";
 import { useActionRunner } from "@/components/toast";
+import { Badge, Button, Card, EmptyState, inputClass } from "@/components/ui";
 import {
   approvePostAction,
   publishPostNowAction,
@@ -22,35 +24,6 @@ const MEDIA_REQUIRED: Record<Post["platform"], boolean> = {
   instagram: true,
   tiktok: true,
 };
-
-const STATUS_LABEL: Record<Post["status"], string> = {
-  draft: "Draft",
-  approved: "Approved",
-  scheduled: "Scheduled",
-  submitted: "Submitted",
-  published: "Published",
-  rejected: "Rejected",
-  failed: "Failed",
-};
-
-const STATUS_COLORS: Record<Post["status"], string> = {
-  draft: "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
-  approved: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  scheduled: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-  submitted: "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300",
-  published: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  rejected: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-  failed: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-};
-
-const btnPrimary =
-  "inline-flex min-h-9 items-center justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50";
-const btnSecondary =
-  "inline-flex min-h-9 items-center justify-center rounded-md border border-black/15 px-3 py-1.5 text-sm transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.05]";
-const btnDanger =
-  "inline-flex min-h-9 items-center justify-center rounded-md border border-red-600/40 px-3 py-1.5 text-sm text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950";
-const inputBase =
-  "w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-white/15";
 
 function PostCard({
   post,
@@ -80,7 +53,12 @@ function PostCard({
   const noAccountConnected = platformConnections.length === 0;
   const editable = post.status !== "published" && post.status !== "submitted";
   const canApprove =
-    !pending && !contentDirty && !mediaDirty && !missingRequiredMedia && !needsAccountChoice && !noAccountConnected;
+    !pending &&
+    !contentDirty &&
+    !mediaDirty &&
+    !missingRequiredMedia &&
+    !needsAccountChoice &&
+    !noAccountConnected;
 
   const approveBlockedReason = noAccountConnected
     ? `Connect a ${post.platform} account first`
@@ -92,35 +70,33 @@ function PostCard({
           ? "Save your edits first"
           : undefined;
 
+  const status = POST_STATUS[post.status];
+
   return (
-    <article className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <Card className="p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded bg-black/5 px-2 py-0.5 font-medium capitalize dark:bg-white/10">
+        <Badge tone="neutral" className="capitalize">
           {post.platform}
-        </span>
-        <span className={`rounded px-2 py-0.5 font-medium ${STATUS_COLORS[post.status]}`}>
-          {STATUS_LABEL[post.status]}
-        </span>
+        </Badge>
+        <Badge tone={status.tone}>{status.label}</Badge>
         {targetConnection ? (
-          <span className="text-neutral-500">→ {targetConnection.account_name}</span>
+          <span className="text-muted">→ {targetConnection.account_name}</span>
         ) : platformConnections.length > 0 ? (
           <span className="text-amber-700 dark:text-amber-400">→ no account chosen</span>
         ) : null}
-        <span className="ml-auto text-neutral-500">
-          {new Date(post.created_at).toLocaleString()}
-        </span>
+        <span className="ml-auto text-muted">{new Date(post.created_at).toLocaleString()}</span>
       </div>
 
       {post.status === "failed" && post.error_message && (
-        <p className="mb-3 rounded-md border border-red-600/30 bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+        <p className="mb-3 rounded-control border border-danger/30 bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
           <strong className="font-semibold">Last publish attempt failed:</strong>{" "}
           {post.error_message}
         </p>
       )}
       {post.status === "submitted" && (
-        <p className="mb-3 rounded-md border border-violet-600/30 bg-violet-50 px-3 py-2 text-sm text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-          Sent to TikTok and accepted for processing. TikTok publishes asynchronously — this isn&apos;t
-          confirmed live yet. Check the account, or the Activity log for the publish id.
+        <p className="mb-3 rounded-control border border-violet-600/30 bg-violet-50 px-3 py-2 text-sm text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+          Sent to TikTok and accepted for processing. TikTok publishes asynchronously — this
+          isn&apos;t confirmed live yet. Check the account, or the Activity log for the publish id.
         </p>
       )}
 
@@ -133,14 +109,14 @@ function PostCard({
         value={content}
         onChange={(e) => setContent(e.target.value)}
         disabled={pending || !editable}
-        className={inputBase}
+        className={inputClass}
       />
 
       {editable && (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div>
             <label
-              className="mb-1 block text-xs font-medium text-neutral-500"
+              className="mb-1 block text-xs font-medium text-muted"
               htmlFor={`media-${post.id}`}
             >
               Media URL{MEDIA_REQUIRED[post.platform] ? " (required)" : " (optional)"}
@@ -153,18 +129,18 @@ function PostCard({
               onChange={(e) => setMediaUrl(e.target.value)}
               disabled={pending}
               placeholder="https://…/image-or-video.jpg"
-              className={inputBase}
+              className={inputClass}
             />
           </div>
           <div>
             <label
-              className="mb-1 block text-xs font-medium text-neutral-500"
+              className="mb-1 block text-xs font-medium text-muted"
               htmlFor={`account-${post.id}`}
             >
               Publish to
             </label>
             {platformConnections.length === 0 ? (
-              <p className="pt-2 text-sm text-neutral-500">
+              <p className="pt-2 text-sm text-muted">
                 No {post.platform} account connected.{" "}
                 <Link href="/connections" className="underline">
                   Connect one
@@ -179,11 +155,9 @@ function PostCard({
                 onChange={(e) => {
                   const next = e.target.value;
                   setConnectionId(next);
-                  run(() => setPostConnectionAction(post.id, next || null), {
-                    onSuccess: refresh,
-                  });
+                  run(() => setPostConnectionAction(post.id, next || null), { onSuccess: refresh });
                 }}
-                className={inputBase}
+                className={inputClass}
               >
                 <option value="">Choose an account…</option>
                 {platformConnections.map((c) => (
@@ -200,46 +174,44 @@ function PostCard({
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {contentDirty && (
-          <button
-            className={btnSecondary}
+          <Button
             disabled={pending}
             onClick={() =>
               run(() => updatePostContentAction(post.id, content), { onSuccess: refresh })
             }
           >
             Save edit
-          </button>
+          </Button>
         )}
         {mediaDirty && (
-          <button
-            className={btnSecondary}
+          <Button
             disabled={pending}
             onClick={() =>
               run(() => updatePostMediaAction(post.id, mediaUrl), { onSuccess: refresh })
             }
           >
             Save media URL
-          </button>
+          </Button>
         )}
 
         {(post.status === "draft" || post.status === "rejected") && (
           <>
-            <button
-              className={btnPrimary}
+            <Button
+              variant="primary"
               disabled={!canApprove}
               title={approveBlockedReason}
               onClick={() => run(() => approvePostAction(post.id), { onSuccess: refresh })}
             >
               Approve
-            </button>
+            </Button>
             {post.status === "draft" && (
-              <button
-                className={btnDanger}
+              <Button
+                variant="danger"
                 disabled={pending}
                 onClick={() => run(() => rejectPostAction(post.id), { onSuccess: refresh })}
               >
                 Reject
-              </button>
+              </Button>
             )}
           </>
         )}
@@ -255,60 +227,57 @@ function PostCard({
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
               disabled={pending}
-              className="min-h-9 rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm dark:border-white/15"
+              className="min-h-9 rounded-control border border-border-strong bg-transparent px-2 py-1.5 text-sm"
             />
-            <button
-              className={btnSecondary}
+            <Button
               disabled={pending || !scheduledAt}
               onClick={() =>
-                run(
-                  () => schedulePostAction(post.id, new Date(scheduledAt).toISOString()),
-                  { onSuccess: refresh }
-                )
+                run(() => schedulePostAction(post.id, new Date(scheduledAt).toISOString()), {
+                  onSuccess: refresh,
+                })
               }
             >
               {post.status === "scheduled" ? "Update schedule" : "Schedule"}
-            </button>
+            </Button>
             {post.status === "scheduled" && (
-              <button
-                className={btnSecondary}
+              <Button
                 disabled={pending}
                 onClick={() => run(() => unschedulePostAction(post.id), { onSuccess: refresh })}
               >
                 Unschedule
-              </button>
+              </Button>
             )}
-            <button
-              className={btnPrimary}
+            <Button
+              variant="primary"
               disabled={pending}
               onClick={() => run(() => publishPostNowAction(post.id), { onSuccess: refresh })}
             >
               Publish now
-            </button>
+            </Button>
           </>
         )}
 
         {post.status === "failed" && (
           <>
-            <button
-              className={btnPrimary}
+            <Button
+              variant="primary"
               disabled={pending || needsAccountChoice || noAccountConnected}
               title={approveBlockedReason}
               onClick={() => run(() => publishPostNowAction(post.id), { onSuccess: refresh })}
             >
               Retry publish
-            </button>
-            <button
-              className={btnDanger}
+            </Button>
+            <Button
+              variant="danger"
               disabled={pending}
               onClick={() => run(() => rejectPostAction(post.id), { onSuccess: refresh })}
             >
               Reject
-            </button>
+            </Button>
           </>
         )}
       </div>
-    </article>
+    </Card>
   );
 }
 
@@ -321,15 +290,12 @@ export function Dashboard({
 }) {
   if (posts.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-black/15 p-8 text-center dark:border-white/15">
-        <p className="text-sm text-neutral-500">
-          No drafts in progress.{" "}
-          <Link href="/new" className="font-medium underline">
-            Draft a post
-          </Link>{" "}
-          to get started.
-        </p>
-      </div>
+      <EmptyState title="No drafts in progress">
+        <Link href="/new" className="font-medium underline">
+          Draft a post
+        </Link>{" "}
+        to get started.
+      </EmptyState>
     );
   }
 

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useActionRunner } from "@/components/toast";
+import { Button, inputClass } from "@/components/ui";
 import { generateDraftAction } from "../actions";
 import type { Platform } from "@/lib/posts";
 
@@ -45,9 +46,6 @@ export function NewDraftForm({ connections }: { connections: ConnectionOption[] 
     }
   }
 
-  const inputBase =
-    "w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-white/15";
-
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <fieldset>
@@ -59,10 +57,10 @@ export function NewDraftForm({ connections }: { connections: ConnectionOption[] 
               type="button"
               aria-pressed={platform === p}
               onClick={() => selectPlatform(p)}
-              className={`min-h-9 rounded-md border px-3 py-1.5 text-sm capitalize transition-colors ${
+              className={`min-h-9 rounded-control border px-3 py-1.5 text-sm capitalize transition-colors ${
                 platform === p
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-black/15 hover:bg-black/[0.03] dark:border-white/15 dark:hover:bg-white/[0.05]"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border-strong hover:bg-black/[0.03] dark:hover:bg-white/[0.06]"
               }`}
             >
               {p}
@@ -73,10 +71,11 @@ export function NewDraftForm({ connections }: { connections: ConnectionOption[] 
 
       <div>
         <label htmlFor="account" className="mb-1.5 block text-sm font-medium">
-          Publish to <span className="font-normal text-neutral-500">(optional now, required before approval)</span>
+          Publish to{" "}
+          <span className="font-normal text-muted">(optional now, required before approval)</span>
         </label>
         {platformConnections.length === 0 ? (
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted">
             No {platform} account connected yet — you can still draft, then connect one before
             approving.
           </p>
@@ -85,7 +84,7 @@ export function NewDraftForm({ connections }: { connections: ConnectionOption[] 
             id="account"
             value={connectionId}
             onChange={(e) => setConnectionId(e.target.value)}
-            className={inputBase}
+            className={inputClass}
           >
             <option value="">Decide later</option>
             {platformConnections.map((c) => (
@@ -108,17 +107,19 @@ export function NewDraftForm({ connections }: { connections: ConnectionOption[] 
           value={productDescription}
           onChange={(e) => setProductDescription(e.target.value)}
           placeholder="e.g. A refillable glass water bottle with a built-in fruit infuser, launching in three colors…"
-          className={inputBase}
+          className={inputClass}
         />
       </div>
 
-      <button
+      <Button
         type="submit"
+        variant="primary"
+        size="md"
         disabled={pending || !productDescription.trim()}
-        className="inline-flex min-h-10 items-center justify-center self-start rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-h-10 self-start px-4"
       >
         {pending ? "Drafting…" : "Generate draft"}
-      </button>
+      </Button>
     </form>
   );
 }
