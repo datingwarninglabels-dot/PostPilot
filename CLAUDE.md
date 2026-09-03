@@ -121,8 +121,9 @@ throw for expected failures** (`app/src/lib/action-result.ts`). The client wraps
 publish or send is always visible, never silent. `toUserMessage()` maps rate-limit/quota/expired-
 token errors to plain guidance.
 
-Shared nav is `app/src/components/app-header.tsx` (Drafts / Comments / History / Activity /
-Connections) — an async Server Component that also renders `AccountSwitcher`
+Shared nav is `app/src/components/app-header.tsx` (async Server Component) → `HeaderNav`
+(`app/src/components/header-nav.tsx`, client): Drafts / Comments / History / Activity / Connections,
+collapsing to a hamburger menu below the `sm` breakpoint. It renders `AccountSwitcher`
 (`app/src/components/account-switcher.tsx`) when >1 account is connected. The switcher writes
 `?account=<connectionId>`; pages resolve it with `getAccountScope()` and scope their queries — posts
 by `connection_id`, comments/replies/activity by that account's platform (and `account_name` for the
@@ -145,6 +146,17 @@ cron route and `publishPostNowAction` so both behave and log identically. It nev
 leaves the post `failed` with `error_message` set. `resolvePostConnection()`
 (`platform-connections.ts`) picks `post.connection_id`, falling back to the oldest connection for the
 platform (logged as a fallback) — the old code picked an arbitrary row, wrong with multiple Pages.
+
+**TikTok `submitted` reconciliation**: `fetchTikTokPublishStatus()`
+(`publishers/tiktok.ts`) polls `/v2/post/publish/status/fetch/`; `reconcileSubmittedPost()`
+(`publish.ts`) moves the post to `published` (real `platform_post_id`) or `failed`, logging either
+way. Triggered by the `reconcilePostStatusAction` ("Check status" button on a submitted card) and
+by the cron route, which also gives up on submissions older than 3 days. So `/api/cron/publish`
+now does two jobs: publish due scheduled posts, then reconcile submitted ones.
+
+Each dashboard card has a **"Preview as {platform}"** toggle
+(`app/src/components/post-preview.tsx`) — a rough, explicitly-approximate render of the post in
+platform chrome, using the live edited content/media.
 
 ### Connections + publishing (Phase 2, done)
 

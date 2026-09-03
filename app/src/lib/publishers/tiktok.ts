@@ -5,9 +5,10 @@ import type { Post } from "@/lib/posts";
 /**
  * Submits a video to TikTok's Content Posting API by URL (TikTok fetches it
  * server-side, so nothing is uploaded through our server). This only
- * *submits* the post — TikTok processes it asynchronously, and this app
- * doesn't poll `/v2/post/publish/status/fetch/` for the final result, so the
- * returned publish_id means "accepted for processing," not "confirmed live."
+ * *submits* the post — TikTok processes it asynchronously. The returned
+ * publish_id means "accepted for processing," not "confirmed live"; the post
+ * is stored as `submitted` and later reconciled to `published`/`failed` by
+ * {@link fetchTikTokPublishStatus} (manually, or on the next cron run).
  * Unaudited apps are restricted to privacy_level SELF_ONLY regardless of what
  * is requested here — published videos are only visible to the connected
  * account until the app passes TikTok's audit.
@@ -47,4 +48,43 @@ export async function publishToTikTok(
     throw new Error(data.error?.message ?? "TikTok publish failed");
   }
   return data.data.publish_id as string;
+}
+
+export type TikTokPublishStatus =
+  | { state: "processing" }
+  | { state: "published"; postId: string | null }
+  | { state: "failed"; reason: string };
+
+/**
+ * Polls `/v2/post/publish/status/fetch/` for the final outcome of a submitted
+ * post. TikTok's status values: PROCESSING_UPLOAD / PROCESSING_DOWNLOAD →
+ * still working; PUBLISH_COMPLETE → live; FAILED → gave a `fail_reason`.
+ */
+export async function fetchTikTokPublishStatus(
+  connection: DecryptedConnection,
+  publishId: string
+): Promise<TikTokPublishStatus> {
+  const res = await fetch("https://open.tiktokapis.com/v2/post/publish/status/fetch/", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${connection.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ publish_id: publishId }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error?.code !== "ok") {
+    throw new Error(data.error?.message ?? "TikTok status check failed");
+  }
+
+  const status: string = data.data?.status ?? "";
+  if (status === "PUBLISH_COMPLETE") {
+    const ids: unknown = data.data?.publicaly_available_post_id;
+    const postId = Array.isArray(ids) && ids.length > 0 ? String(ids[0]) : null;
+    return { state: "published", postId };
+  }
+  if (status === "FAILED") {
+    return { state: "failed", reason: data.data?.fail_reason ?? "TikTok reported FAILED" };
+  }
+  return { state: "processing" };
 }

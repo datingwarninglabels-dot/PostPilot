@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "./supabase-admin";
 import { resolvePostConnection } from "./platform-connections";
 import { publishToFacebook } from "./publishers/facebook";
 import { publishToInstagram } from "./publishers/instagram";
-import { publishToTikTok } from "./publishers/tiktok";
+import { publishToTikTok, fetchTikTokPublishStatus } from "./publishers/tiktok";
 import { logActivity } from "./activity";
 import type { Post, Platform } from "./posts";
 
@@ -102,6 +102,91 @@ export async function publishPost(post: Post, actor: string): Promise<PublishOut
       detail: { error: message },
     });
 
+    return { ok: false, error: message };
+  }
+}
+
+export type ReconcileOutcome =
+  | { ok: true; state: "processing" | "published" | "failed"; message: string }
+  | { ok: false; error: string };
+
+/**
+ * Checks a `submitted` post (currently TikTok only) against the platform and
+ * moves it to `published` or `failed` once the platform has finished processing
+ * it. Called from the "Check status" action and the cron publisher. Never
+ * throws; a check failure leaves the post `submitted` for the next attempt.
+ */
+export async function reconcileSubmittedPost(
+  post: Post,
+  actor: string
+): Promise<ReconcileOutcome> {
+  const supabase = getSupabaseAdmin();
+
+  if (post.platform !== "tiktok" || !post.platform_post_id) {
+    return { ok: true, state: "processing", message: "Nothing to reconcile." };
+  }
+
+  try {
+    const resolved = await resolvePostConnection(post);
+    if (resolved.kind === "none_connected" || resolved.kind === "target_missing") {
+      throw new Error("The TikTok account for this post is no longer connected.");
+    }
+
+    const status = await fetchTikTokPublishStatus(resolved.connection, post.platform_post_id);
+
+    if (status.state === "processing") {
+      return { ok: true, state: "processing", message: "TikTok is still processing this post." };
+    }
+
+    if (status.state === "published") {
+      await supabase
+        .from("posts")
+        .update({
+          status: "published",
+          platform_post_id: status.postId ?? post.platform_post_id,
+          published_at: post.published_at ?? new Date().toISOString(),
+          error_message: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", post.id);
+      await logActivity({
+        actor,
+        eventType: "post_publish_attempt",
+        entityType: "post",
+        entityId: post.id,
+        platform: "tiktok",
+        accountName: resolved.connection.account_name,
+        status: "success",
+        summary: `TikTok confirmed the post is live (${resolved.connection.account_name})`,
+        detail: { publish_id: post.platform_post_id, post_id: status.postId },
+        targetPlatformId: status.postId ?? post.platform_post_id,
+      });
+      return { ok: true, state: "published", message: "TikTok confirms the post is live." };
+    }
+
+    // failed
+    await supabase
+      .from("posts")
+      .update({
+        status: "failed",
+        error_message: `TikTok processing failed: ${status.reason}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", post.id);
+    await logActivity({
+      actor,
+      eventType: "post_publish_attempt",
+      entityType: "post",
+      entityId: post.id,
+      platform: "tiktok",
+      status: "failure",
+      summary: "TikTok processing failed after submission",
+      detail: { publish_id: post.platform_post_id, fail_reason: status.reason },
+    });
+    return { ok: true, state: "failed", message: `TikTok rejected the post: ${status.reason}` };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Status check failed";
+    console.error(`Failed to reconcile post ${post.id}:`, err);
     return { ok: false, error: message };
   }
 }

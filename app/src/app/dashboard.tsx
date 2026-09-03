@@ -8,9 +8,11 @@ import type { PlatformConnectionWithHealth } from "@/lib/platform-connections";
 import { POST_STATUS } from "@/lib/status-display";
 import { useActionRunner } from "@/components/toast";
 import { Badge, Button, Card, EmptyState, inputClass } from "@/components/ui";
+import { PostPreview } from "@/components/post-preview";
 import {
   approvePostAction,
   publishPostNowAction,
+  reconcilePostStatusAction,
   rejectPostAction,
   schedulePostAction,
   setPostConnectionAction,
@@ -42,6 +44,7 @@ function PostCard({
   const [scheduledAt, setScheduledAt] = useState(
     post.scheduled_at ? post.scheduled_at.slice(0, 16) : ""
   );
+  const [showPreview, setShowPreview] = useState(false);
 
   const platformConnections = connections.filter((c) => c.platform === post.platform);
   const targetConnection = platformConnections.find((c) => c.id === connectionId) ?? null;
@@ -94,10 +97,21 @@ function PostCard({
         </p>
       )}
       {post.status === "submitted" && (
-        <p className="mb-3 rounded-control border border-violet-600/30 bg-violet-50 px-3 py-2 text-sm text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-          Sent to TikTok and accepted for processing. TikTok publishes asynchronously — this
-          isn&apos;t confirmed live yet. Check the account, or the Activity log for the publish id.
-        </p>
+        <div className="mb-3 rounded-control border border-violet-600/30 bg-violet-50 px-3 py-2 text-sm text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+          <p>
+            Sent to TikTok and accepted for processing — not confirmed live yet. The daily cron
+            re-checks automatically; check now if you want an answer sooner.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            disabled={pending}
+            onClick={() => run(() => reconcilePostStatusAction(post.id), { onSuccess: refresh })}
+          >
+            Check status
+          </Button>
+        </div>
       )}
 
       <label className="sr-only" htmlFor={`content-${post.id}`}>
@@ -171,6 +185,30 @@ function PostCard({
           </div>
         </div>
       )}
+
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => setShowPreview((v) => !v)}
+          aria-expanded={showPreview}
+          className="text-xs font-medium text-muted underline-offset-2 hover:text-foreground hover:underline"
+        >
+          {showPreview ? "Hide preview" : `Preview as ${post.platform}`}
+        </button>
+        {showPreview && (
+          <div className="mt-2">
+            <PostPreview
+              platform={post.platform}
+              content={content}
+              mediaUrl={mediaUrl}
+              accountName={targetConnection?.account_name}
+            />
+            <p className="mt-1 text-center text-[11px] text-muted">
+              Approximate — real rendering varies by device.
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {contentDirty && (

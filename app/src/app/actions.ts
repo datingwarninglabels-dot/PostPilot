@@ -12,7 +12,7 @@ import {
 } from "@/lib/platform-connections";
 import { getCommentById } from "@/lib/comments";
 import { getPostById } from "@/lib/posts";
-import { publishPost } from "@/lib/publish";
+import { publishPost, reconcileSubmittedPost } from "@/lib/publish";
 import { logActivity } from "@/lib/activity";
 import { type ActionResult, ok, fail, toUserMessage } from "@/lib/action-result";
 import { sendReply as sendFacebookReply } from "@/lib/repliers/facebook";
@@ -330,6 +330,24 @@ export async function publishPostNowAction(id: string): Promise<ActionResult> {
           `Submitted to TikTok (${outcome.accountName}). TikTok is still processing it — not confirmed live yet.`
         )
       : ok(`Published to ${post.platform} · ${outcome.accountName}.`);
+  } catch (err) {
+    return fail(toUserMessage(err));
+  }
+}
+
+/** Ask the platform whether a `submitted` post (TikTok) finished processing. */
+export async function reconcilePostStatusAction(id: string): Promise<ActionResult> {
+  const user = await requireAdmin();
+  try {
+    const post = await getPostById(id);
+    if (!post) return fail("That post no longer exists.");
+    if (post.status !== "submitted") return fail("That post isn't awaiting a status check.");
+
+    const outcome = await reconcileSubmittedPost(post, user.email ?? "admin");
+    revalidateAll();
+
+    if (!outcome.ok) return fail(outcome.error);
+    return outcome.state === "failed" ? fail(outcome.message) : ok(outcome.message);
   } catch (err) {
     return fail(toUserMessage(err));
   }
