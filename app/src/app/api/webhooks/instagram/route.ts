@@ -43,7 +43,13 @@ export async function POST(request: NextRequest) {
     return new NextResponse(null, { status: 403 });
   }
 
-  const payload = JSON.parse(raw) as { entry?: InstagramEntry[] };
+  let payload: { entry?: InstagramEntry[] };
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    console.error("Instagram webhook: signature ok but body is not JSON");
+    return NextResponse.json({ ok: true });
+  }
 
   for (const entry of payload.entry ?? []) {
     try {

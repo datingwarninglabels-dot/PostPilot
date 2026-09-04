@@ -1,8 +1,7 @@
 import "server-only";
+import { GRAPH_VERSION } from "@/lib/meta";
 import type { DecryptedConnection } from "@/lib/platform-connections";
 import type { Comment } from "@/lib/comments";
-
-const GRAPH_VERSION = "v21.0";
 
 /**
  * Sends an approved reply back to Facebook — a public comment reply (matches the

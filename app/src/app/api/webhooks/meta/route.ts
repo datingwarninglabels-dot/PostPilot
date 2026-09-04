@@ -43,7 +43,15 @@ export async function POST(request: NextRequest) {
     return new NextResponse(null, { status: 403 });
   }
 
-  const payload = JSON.parse(raw) as { entry?: MetaEntry[] };
+  let payload: { entry?: MetaEntry[] };
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    // Signature was valid but the body isn't JSON — nothing we can do with it.
+    // Return 200 so Meta doesn't retry a payload that will never parse.
+    console.error("Meta webhook: signature ok but body is not JSON");
+    return NextResponse.json({ ok: true });
+  }
 
   for (const entry of payload.entry ?? []) {
     try {

@@ -1,8 +1,7 @@
 import "server-only";
+import { GRAPH_VERSION } from "@/lib/meta";
 import type { DecryptedConnection } from "@/lib/platform-connections";
 import type { Post } from "@/lib/posts";
-
-const GRAPH_VERSION = "v21.0";
 
 /** Posts to a Facebook Page — with a photo if media_urls[0] is set, text-only otherwise. */
 export async function publishToFacebook(

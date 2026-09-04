@@ -3,8 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { upsertConnection } from "@/lib/platform-connections";
 import { logActivity } from "@/lib/activity";
-
-const GRAPH_VERSION = "v21.0";
+import { GRAPH_VERSION } from "@/lib/meta";
 
 function connectionsRedirect(request: NextRequest, error?: string): NextResponse {
   const url = new URL("/connections", request.url);

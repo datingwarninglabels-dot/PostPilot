@@ -1,8 +1,7 @@
 import "server-only";
+import { GRAPH_VERSION } from "@/lib/meta";
 import type { DecryptedConnection } from "@/lib/platform-connections";
 import type { Post } from "@/lib/posts";
-
-const GRAPH_VERSION = "v21.0";
 
 /**
  * Posts a single image to an Instagram professional account via the
