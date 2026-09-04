@@ -19,15 +19,15 @@ export default async function ConnectionsPage({
   return (
     <>
       <AppHeader active="/connections" />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+      <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="mb-1 text-lg font-semibold">Connected accounts</h1>
-        <p className="mb-6 text-sm text-neutral-500">
+        <p className="mb-6 text-sm text-muted">
           The Facebook Pages, Instagram accounts, and TikTok profiles PostPilot can publish to and
           read comments from. Reconnect an account to refresh an expiring token or add new
           permissions.
         </p>
         {error && (
-          <div className="mb-4 rounded-md border border-red-600/30 bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+          <div className="mb-4 rounded-control border border-danger/30 bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
             Connection failed: {error}
           </div>
         )}

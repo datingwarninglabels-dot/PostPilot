@@ -39,10 +39,10 @@ export default async function HomePage({
   return (
     <>
       <AppHeader active="/" />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+      <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
         {firstRun && (
-          <section className="mb-8 rounded-card border border-border bg-surface p-5">
-            <h1 className="text-lg font-semibold">Get set up</h1>
+          <section aria-labelledby="setup-heading" className="mb-8 rounded-card border border-border bg-surface p-5">
+            <h2 id="setup-heading" className="text-lg font-semibold">Get set up</h2>
             <p className="mt-1 text-sm text-muted">
               Three steps to your first published post. Every post still needs your explicit
               approval — nothing goes out on its own.

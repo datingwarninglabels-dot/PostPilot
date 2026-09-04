@@ -1,6 +1,9 @@
 import "server-only";
+import { cache } from "react";
 import { getSupabaseAdmin } from "./supabase-admin";
 import { decryptToken, encryptToken } from "./crypto";
+import { needsRefresh, refreshTokens } from "./token-refresh";
+import { logActivity } from "./activity";
 import type { Platform } from "./posts";
 
 export type PlatformConnection = {
@@ -39,8 +42,12 @@ function healthOf(expiresAt: string | null): { health: ConnectionHealthStatus; d
   return { health: "ok", days };
 }
 
-/** For the /connections UI — token ciphertext is never selected. */
-export async function listConnections(): Promise<PlatformConnection[]> {
+/**
+ * For the /connections UI and the header switcher — token ciphertext is never
+ * selected. `cache()`d per request: the header, the page, and `publishBlocker`
+ * all call this on a single render, and it's the same small table each time.
+ */
+export const listConnections = cache(async (): Promise<PlatformConnection[]> => {
   const { data, error } = await getSupabaseAdmin()
     .from("platform_connections")
     .select("id, platform, account_name, account_id, expires_at, created_at, updated_at")
@@ -49,7 +56,7 @@ export async function listConnections(): Promise<PlatformConnection[]> {
 
   if (error) throw error;
   return data as PlatformConnection[];
-}
+});
 
 export async function listConnectionsWithHealth(): Promise<PlatformConnectionWithHealth[]> {
   const connections = await listConnections();
@@ -128,6 +135,51 @@ function toDecrypted(data: Record<string, string | null>): DecryptedConnection {
   };
 }
 
+/**
+ * If the token is close to expiring, refresh it (TikTok requires this ~daily),
+ * persist the new tokens, and return the updated connection. Best-effort: a
+ * refresh failure returns the connection as-is so the publish can still try (and
+ * fail loudly with the platform's own message if the token really is dead).
+ */
+async function withFreshToken(conn: DecryptedConnection): Promise<DecryptedConnection> {
+  if (!needsRefresh(conn.platform, conn.expires_at)) return conn;
+
+  const refreshed = await refreshTokens(conn.platform, conn.access_token, conn.refresh_token);
+  if (!refreshed) return conn;
+
+  await getSupabaseAdmin()
+    .from("platform_connections")
+    .update({
+      access_token_encrypted: encryptToken(refreshed.accessToken),
+      refresh_token_encrypted: refreshed.refreshToken
+        ? encryptToken(refreshed.refreshToken)
+        : conn.refresh_token
+          ? encryptToken(conn.refresh_token)
+          : null,
+      expires_at: refreshed.expiresAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", conn.id);
+
+  await logActivity({
+    actor: "system:token-refresh",
+    eventType: "connection_added",
+    entityType: "connection",
+    entityId: conn.id,
+    platform: conn.platform,
+    accountName: conn.account_name,
+    status: "info",
+    summary: `Refreshed the ${conn.platform} access token for ${conn.account_name}`,
+  });
+
+  return {
+    ...conn,
+    access_token: refreshed.accessToken,
+    refresh_token: refreshed.refreshToken ?? conn.refresh_token,
+    expires_at: refreshed.expiresAt,
+  };
+}
+
 /** The account a post explicitly targets. Preferred over {@link getDecryptedConnection}. */
 export async function getDecryptedConnectionById(
   id: string
@@ -140,7 +192,7 @@ export async function getDecryptedConnectionById(
 
   if (error) throw error;
   if (!data) return null;
-  return toDecrypted(data);
+  return withFreshToken(toDecrypted(data));
 }
 
 /**
@@ -163,7 +215,7 @@ export async function getDecryptedConnection(
 
   if (error) throw error;
   if (!data) return null;
-  return toDecrypted(data);
+  return withFreshToken(toDecrypted(data));
 }
 
 /**

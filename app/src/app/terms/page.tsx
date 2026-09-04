@@ -1,52 +1,50 @@
 export const metadata = {
   title: "Terms of Service",
+  description: "Terms for PostPilot, a private single-owner social media tool.",
 };
+
+const CONTACT = "numewhou916@gmail.com";
+const UPDATED = "September 3, 2026";
 
 export default function TermsOfServicePage() {
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10 text-sm leading-relaxed">
-      <h1 className="mb-6 text-xl font-semibold">Terms of Service</h1>
+    <div className="mx-auto max-w-2xl px-6 py-12 text-sm leading-relaxed">
+      <h1 className="text-xl font-semibold">Terms of Service</h1>
+      <p className="mt-1 text-muted">Last updated: {UPDATED}</p>
 
-      <p className="mb-4 text-neutral-500">
-        Last updated: this is a placeholder terms document for an internal, single-owner tool —
-        not a public-facing product. It exists to satisfy platform developer-console requirements
-        (e.g. TikTok) that a Terms of Service URL be provided.
-      </p>
-
-      <h2 className="mt-6 mb-2 font-medium">What this application is</h2>
+      <h2 className="mt-8 mb-2 font-semibold">What PostPilot is</h2>
       <p className="mb-4">
-        This is an internal social media automation tool used by a single owner to draft, review,
-        schedule, and publish posts to their own Facebook, Instagram, and TikTok accounts. It has
-        no public sign-up and no end users other than the owner.
+        PostPilot is a private social media automation tool used by a single owner to draft,
+        review, schedule, and publish posts to their own Facebook, Instagram, and TikTok accounts,
+        and to read and reply to comments and messages on those accounts. It has no public sign-up
+        and no users other than the owner.
       </p>
 
-      <h2 className="mt-6 mb-2 font-medium">Acceptance of terms</h2>
+      <h2 className="mt-6 mb-2 font-semibold">Acceptance</h2>
       <p className="mb-4">
-        By signing in as the application&apos;s admin, the owner agrees to these terms. There is no
-        other way to access this application.
+        Signing in as the application&apos;s owner constitutes acceptance of these terms. There is
+        no other way to access the application.
       </p>
 
-      <h2 className="mt-6 mb-2 font-medium">Use of connected accounts</h2>
+      <h2 className="mt-6 mb-2 font-semibold">Use of connected accounts</h2>
       <p className="mb-4">
-        The owner authorizes this application to publish approved, scheduled posts to their own
-        connected Facebook, Instagram, and TikTok accounts, and, where enabled, to read and reply
-        to comments/DMs on those accounts. The application takes no action on any account without
-        the owner&apos;s explicit approval of each post or reply.
+        The owner authorizes PostPilot to publish approved posts and send approved replies to
+        their own connected Facebook, Instagram, and TikTok accounts. PostPilot takes no action on
+        any account without the owner&apos;s explicit, per-item approval; it never auto-publishes
+        or auto-replies.
       </p>
 
-      <h2 className="mt-6 mb-2 font-medium">No warranty</h2>
+      <h2 className="mt-6 mb-2 font-semibold">No warranty</h2>
       <p className="mb-4">
-        This application is provided as-is, for the owner&apos;s personal use, with no warranty of
-        any kind.
+        PostPilot is provided as-is, for the owner&apos;s personal use, with no warranty of any
+        kind. Publishing depends on third-party platform APIs that may change or fail.
       </p>
 
-      <h2 className="mt-6 mb-2 font-medium">Contact</h2>
+      <h2 className="mt-6 mb-2 font-semibold">Contact</h2>
       <p>
-        Questions about these terms can be sent to{" "}
-        <a href="mailto:numewhou916@gmail.com" className="underline">
-          numewhou916@gmail.com
+        <a href={`mailto:${CONTACT}`} className="underline">
+          {CONTACT}
         </a>
-        .
       </p>
     </div>
   );

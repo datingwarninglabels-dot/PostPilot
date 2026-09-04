@@ -100,17 +100,17 @@ export default async function ActivityPage({
   };
 
   const select =
-    "min-h-9 rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm dark:border-white/15";
+    "min-h-9 rounded-control border border-border-strong bg-transparent px-2 py-1.5 text-sm";
 
   return (
     <>
       <AppHeader active="/activity" />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
+      <main id="main-content" className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold">Activity log</h1>
           <a
             href={`/api/activity/export${qs(baseParams)}`}
-            className="inline-flex min-h-9 items-center rounded-md border border-black/15 px-3 py-1.5 text-sm transition-colors hover:bg-black/[0.03] dark:border-white/15 dark:hover:bg-white/[0.05]"
+            className="inline-flex min-h-9 items-center rounded-control border border-border-strong px-3 py-1.5 text-sm transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.06]"
           >
             Export CSV
           </a>
@@ -160,34 +160,32 @@ export default async function ActivityPage({
               name="q"
               defaultValue={filters.q ?? ""}
               placeholder="summary or account name"
-              className="min-h-9 w-full rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm dark:border-white/15"
+              className="min-h-9 w-full rounded-control border border-border-strong bg-transparent px-2 py-1.5 text-sm"
             />
           </label>
           <button
             type="submit"
-            className="inline-flex min-h-9 items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex min-h-9 items-center rounded-control bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
           >
             Apply
           </button>
           <Link
             href="/activity"
-            className="inline-flex min-h-9 items-center rounded-md px-2 py-1.5 text-sm text-muted hover:text-foreground"
+            className="inline-flex min-h-9 items-center rounded-control px-2 py-1.5 text-sm text-muted hover:text-foreground"
           >
             Clear
           </Link>
         </form>
 
         {entries.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-black/15 p-8 text-center dark:border-white/15">
-            <p className="text-sm text-muted">
-              No activity matches these filters yet.
-            </p>
+          <div className="rounded-card border border-dashed border-border-strong p-8 text-center">
+            <p className="text-sm text-muted">No activity matches these filters yet.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
+          <div className="overflow-x-auto rounded-card border border-border">
             <table className="w-full min-w-[720px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-muted dark:border-white/10">
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                   <th className="px-3 py-2 font-medium">When</th>
                   <th className="px-3 py-2 font-medium">Event</th>
                   <th className="px-3 py-2 font-medium">Account</th>
@@ -199,7 +197,7 @@ export default async function ActivityPage({
                 {entries.map((e) => (
                   <tr
                     key={e.id}
-                    className="border-b border-black/5 align-top last:border-0 dark:border-white/5"
+                    className="border-b border-border/60 align-top last:border-0"
                   >
                     <td className="whitespace-nowrap px-3 py-2 text-muted">
                       {new Date(e.created_at).toLocaleString()}
@@ -229,7 +227,7 @@ export default async function ActivityPage({
                           <summary className="cursor-pointer text-xs text-muted">
                             more
                           </summary>
-                          <pre className="mt-1 max-w-md overflow-x-auto rounded bg-black/5 p-2 text-xs dark:bg-white/5">
+                          <pre className="mt-1 max-w-md overflow-x-auto rounded bg-black/[0.04] p-2 text-xs dark:bg-white/[0.06]">
                             {JSON.stringify(e.detail, null, 2)}
                           </pre>
                         </details>
@@ -251,7 +249,7 @@ export default async function ActivityPage({
               {page > 0 && (
                 <Link
                   href={`/activity${qs({ ...baseParams, page: page - 1 })}`}
-                  className="rounded-md border border-black/15 px-3 py-1.5 dark:border-white/15"
+                  className="rounded-control border border-border-strong px-3 py-1.5"
                 >
                   Newer
                 </Link>
@@ -259,7 +257,7 @@ export default async function ActivityPage({
               {page + 1 < totalPages && (
                 <Link
                   href={`/activity${qs({ ...baseParams, page: page + 1 })}`}
-                  className="rounded-md border border-black/15 px-3 py-1.5 dark:border-white/15"
+                  className="rounded-control border border-border-strong px-3 py-1.5"
                 >
                   Older
                 </Link>

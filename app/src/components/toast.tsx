@@ -34,7 +34,7 @@ const STYLE: Record<ToastKind, string> = {
     "border-green-600/30 bg-green-50 text-green-900 dark:border-green-400/20 dark:bg-green-950 dark:text-green-100",
   error:
     "border-red-600/30 bg-red-50 text-red-900 dark:border-red-400/20 dark:bg-red-950 dark:text-red-100",
-  info: "border-black/15 bg-white text-neutral-900 dark:border-white/15 dark:bg-neutral-900 dark:text-neutral-100",
+  info: "border-border-strong bg-card text-foreground",
 };
 
 const ICON: Record<ToastKind, string> = { success: "✓", error: "!", info: "i" };
@@ -78,7 +78,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role={t.kind === "error" ? "alert" : "status"}
-            className={`toast-enter pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg ${STYLE[t.kind]}`}
+            className={`toast-enter pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-card border px-4 py-3 text-sm shadow-[var(--shadow-pop)] ${STYLE[t.kind]}`}
           >
             <span
               aria-hidden

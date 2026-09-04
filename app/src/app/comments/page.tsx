@@ -19,7 +19,7 @@ export default async function CommentsPage({
   return (
     <>
       <AppHeader active="/comments" />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+      <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="mb-1 text-lg font-semibold">
           Comments &amp; DMs
           {scope && (

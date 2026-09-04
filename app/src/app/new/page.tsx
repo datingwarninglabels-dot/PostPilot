@@ -12,9 +12,9 @@ export default async function NewDraftPage() {
   return (
     <>
       <AppHeader active="/new" />
-      <main className="mx-auto w-full max-w-xl flex-1 px-4 py-8 sm:px-6">
+      <main id="main-content" className="mx-auto w-full max-w-xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="mb-1 text-lg font-semibold">Draft a post</h1>
-        <p className="mb-6 text-sm text-neutral-500">
+        <p className="mb-6 text-sm text-muted">
           Describe the product. The AI writes a first draft for the platform and tone you pick —
           you review and approve it before anything publishes.
         </p>

@@ -7,14 +7,21 @@ export function SignOutButton() {
   const router = useRouter();
 
   async function handleSignOut() {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
+    try {
+      await createSupabaseBrowserClient().auth.signOut();
+    } catch {
+      // Network hiccup — still send them to /login; the server gate re-checks.
+    }
     router.push("/login");
     router.refresh();
   }
 
   return (
-    <button type="button" onClick={handleSignOut} className="text-sm text-neutral-500 hover:underline">
+    <button
+      type="button"
+      onClick={handleSignOut}
+      className="text-sm text-muted transition-colors hover:text-foreground"
+    >
       Sign out
     </button>
   );

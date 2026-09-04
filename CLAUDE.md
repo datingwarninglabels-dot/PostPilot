@@ -147,6 +147,13 @@ leaves the post `failed` with `error_message` set. `resolvePostConnection()`
 (`platform-connections.ts`) picks `post.connection_id`, falling back to the oldest connection for the
 platform (logged as a fallback) — the old code picked an arbitrary row, wrong with multiple Pages.
 
+**Token refresh**: `getDecryptedConnection*()` run `withFreshToken()` before returning — when a
+token is within an hour of expiry it's refreshed via `app/src/lib/token-refresh.ts` (TikTok
+`refresh_token` grant, required ~daily; Instagram `ig_refresh_token`; Facebook Page tokens don't
+expire), the new tokens are persisted, and an `info` activity row is written. Best-effort: a
+refresh failure returns the connection as-is so the publish still tries and fails loudly.
+`listConnections()` is `cache()`d per request (header + page + `publishBlocker` all call it).
+
 **TikTok `submitted` reconciliation**: `fetchTikTokPublishStatus()`
 (`publishers/tiktok.ts`) polls `/v2/post/publish/status/fetch/`; `reconcileSubmittedPost()`
 (`publish.ts`) moves the post to `published` (real `platform_post_id`) or `failed`, logging either

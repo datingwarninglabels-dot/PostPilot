@@ -55,7 +55,7 @@ export default async function HistoryPage({
   return (
     <>
       <AppHeader active="/history" />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+      <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="mb-1 text-lg font-semibold">What went out</h1>
         <p className="mb-6 text-sm text-muted">
           Posts published and replies sent, newest first. Open a Facebook post to check how it&apos;s

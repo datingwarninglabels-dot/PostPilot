@@ -32,10 +32,13 @@ export default function LoginPage() {
     }
   }
 
+  const field =
+    "min-h-10 rounded-control border border-border-strong bg-transparent px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
+
   return (
     <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
       <h1 className="text-xl font-semibold tracking-tight">PostPilot</h1>
-      <p className="mt-1 mb-6 text-sm text-neutral-500">
+      <p className="mt-1 mb-6 text-sm text-muted">
         Sign in to draft, review, and approve social posts. This is a private, owner-only tool.
       </p>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -50,7 +53,7 @@ export default function LoginPage() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="min-h-10 rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-white/15"
+          className={field}
         />
         <label className="sr-only" htmlFor="password">
           Password
@@ -63,17 +66,17 @@ export default function LoginPage() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="min-h-10 rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-white/15"
+          className={field}
         />
         {error && (
-          <div role="alert" className="text-sm text-red-600 dark:text-red-400">
+          <div role="alert" className="text-sm text-danger">
             {error}
           </div>
         )}
         <button
           type="submit"
           disabled={loading}
-          className="mt-1 inline-flex min-h-10 items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          className="mt-1 inline-flex min-h-10 items-center justify-center rounded-control bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-50"
         >
           {loading ? "Signing in…" : "Sign in"}
         </button>
