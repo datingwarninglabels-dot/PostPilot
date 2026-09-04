@@ -1,8 +1,14 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { listSentPosts, platformPostUrl, type SentPost } from "@/lib/posts";
 import { listSentReplies, type SentReply } from "@/lib/comments";
 import { getAccountScope } from "@/lib/platform-connections";
+import {
+  getEngagementForPosts,
+  summarizeEngagement,
+  type EngagementResult,
+} from "@/lib/insights";
 import { AppHeader } from "@/components/app-header";
 import { Badge, Card, EmptyState } from "@/components/ui";
 
@@ -19,7 +25,9 @@ function dayKey(iso: string | null): string {
 }
 
 function time(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "";
+  return iso
+    ? new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : "";
 }
 
 type Entry =
@@ -39,6 +47,37 @@ export default async function HistoryPage({
     listSentReplies(60, scope ? { platform: scope.platform } : undefined),
   ]);
 
+  return (
+    <>
+      <AppHeader active="/history" />
+      <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+        <h1 className="mb-1 text-lg font-semibold">What went out</h1>
+        <p className="mb-6 text-sm text-muted">
+          Posts published and replies sent, newest first, with live engagement counts pulled from
+          each platform. Full timestamps and publish IDs are in the{" "}
+          <Link href="/activity" className="underline">
+            activity log
+          </Link>
+          .
+        </p>
+
+        {posts.length === 0 && replies.length === 0 ? (
+          <EmptyState title="Nothing has gone out yet">
+            Approved posts you publish or schedule, and replies you send, will show up here.
+          </EmptyState>
+        ) : (
+          <Suspense fallback={<HistorySkeleton />}>
+            <HistoryList posts={posts} replies={replies} />
+          </Suspense>
+        )}
+      </main>
+    </>
+  );
+}
+
+async function HistoryList({ posts, replies }: { posts: SentPost[]; replies: SentReply[] }) {
+  const engagement = await getEngagementForPosts(posts);
+
   const entries: Entry[] = [
     ...posts.map((p) => ({ kind: "post" as const, at: p.published_at, data: p })),
     ...replies.map((r) => ({ kind: "reply" as const, at: r.sent_at, data: r })),
@@ -52,50 +91,74 @@ export default async function HistoryPage({
     else byDay.set(k, [e]);
   }
 
-  return (
-    <>
-      <AppHeader active="/history" />
-      <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
-        <h1 className="mb-1 text-lg font-semibold">What went out</h1>
-        <p className="mb-6 text-sm text-muted">
-          Posts published and replies sent, newest first. Open a Facebook post to check how it&apos;s
-          doing; full timestamps and publish ids are in the{" "}
-          <Link href="/activity" className="underline">
-            activity log
-          </Link>
-          .
-        </p>
+  const summary = summarizeEngagement(posts, engagement);
 
-        {entries.length === 0 ? (
-          <EmptyState title="Nothing has gone out yet">
-            Approved posts you publish or schedule, and replies you send, will show up here.
-          </EmptyState>
-        ) : (
-          <div className="flex flex-col gap-6">
-            {[...byDay.entries()].map(([day, items]) => (
-              <section key={day}>
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                  {day}
-                </h2>
-                <div className="flex flex-col gap-2">
-                  {items.map((e) =>
-                    e.kind === "post" ? (
-                      <PostRow key={`p-${e.data.id}`} post={e.data} />
-                    ) : (
-                      <ReplyRow key={`r-${e.data.id}`} reply={e.data} />
-                    )
-                  )}
-                </div>
-              </section>
-            ))}
+  return (
+    <div className="flex flex-col gap-6">
+      {summary.posts > 0 && (
+        <Card className="p-3 text-sm">
+          <span className="font-medium">Last 30 days:</span>{" "}
+          <span className="text-muted">
+            {summary.likes.toLocaleString()} likes · {summary.comments.toLocaleString()} comments
+            across {summary.posts} post{summary.posts === 1 ? "" : "s"}
+          </span>
+        </Card>
+      )}
+      {summary.missingScopes.length > 0 && (
+        <p className="rounded-control border border-amber-600/30 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+          Some engagement data needs OAuth scopes this app doesn&apos;t have:{" "}
+          {summary.missingScopes.join(", ")}. Reconnect the account after adding them to see it.
+        </p>
+      )}
+
+      {[...byDay.entries()].map(([day, items]) => (
+        <section key={day}>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{day}</h2>
+          <div className="flex flex-col gap-2">
+            {items.map((e) =>
+              e.kind === "post" ? (
+                <PostRow key={`p-${e.data.id}`} post={e.data} engagement={engagement.get(e.data.id)} />
+              ) : (
+                <ReplyRow key={`r-${e.data.id}`} reply={e.data} />
+              )
+            )}
           </div>
-        )}
-      </main>
-    </>
+        </section>
+      ))}
+    </div>
   );
 }
 
-function PostRow({ post }: { post: SentPost }) {
+function HistorySkeleton() {
+  return (
+    <div className="flex flex-col gap-2" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="h-24 animate-pulse rounded-card border border-border bg-card" />
+      ))}
+    </div>
+  );
+}
+
+function EngagementLine({ result }: { result: EngagementResult | undefined }) {
+  if (!result) return null;
+  if (!result.ok) {
+    return (
+      <p className="mt-1 text-xs text-muted">
+        Engagement unavailable{result.missingScope ? ` — needs scope: ${result.missingScope}` : ""}.
+      </p>
+    );
+  }
+  const { likes, comments, shares, views } = result.engagement;
+  const parts = [
+    likes != null && `${likes.toLocaleString()} likes`,
+    comments != null && `${comments.toLocaleString()} comments`,
+    shares != null && `${shares.toLocaleString()} shares`,
+    views != null && `${views.toLocaleString()} views`,
+  ].filter(Boolean);
+  return <p className="mt-1 text-xs font-medium">{parts.join(" · ") || "No engagement yet"}</p>;
+}
+
+function PostRow({ post, engagement }: { post: SentPost; engagement?: EngagementResult }) {
   const url = platformPostUrl(post);
   return (
     <Card className="p-3">
@@ -110,6 +173,7 @@ function PostRow({ post }: { post: SentPost }) {
         <span className="ml-auto text-muted">{time(post.published_at)}</span>
       </div>
       <p className="line-clamp-3 whitespace-pre-wrap text-sm">{post.content}</p>
+      {post.status === "published" && <EngagementLine result={engagement} />}
       {url && (
         <a
           href={url}
