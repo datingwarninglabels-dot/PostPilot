@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { createHash, randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
-const TIKTOK_OAUTH_SCOPES = ["user.info.basic", "video.publish"].join(",");
+// video.list is needed to read engagement (/v2/video/query/ and /v2/video/list/);
+// user.info.basic + video.publish only cover connecting and submitting posts.
+const TIKTOK_OAUTH_SCOPES = ["user.info.basic", "video.publish", "video.list"].join(",");
 
 /**
  * TikTok requires PKCE for its authorize step. Its code_challenge is a

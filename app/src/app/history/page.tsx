@@ -148,14 +148,22 @@ function EngagementLine({ result }: { result: EngagementResult | undefined }) {
       </p>
     );
   }
-  const { likes, comments, shares, views } = result.engagement;
+  const { likes, comments, shares, views, reach } = result.engagement;
   const parts = [
     likes != null && `${likes.toLocaleString()} likes`,
     comments != null && `${comments.toLocaleString()} comments`,
     shares != null && `${shares.toLocaleString()} shares`,
     views != null && `${views.toLocaleString()} views`,
+    reach != null && `${reach.toLocaleString()} reach`,
   ].filter(Boolean);
-  return <p className="mt-1 text-xs font-medium">{parts.join(" · ") || "No engagement yet"}</p>;
+  return (
+    <p className="mt-1 text-xs font-medium">
+      {parts.join(" · ") || "No engagement yet"}
+      {result.missingScope && (
+        <span className="font-normal text-muted"> · reach needs {result.missingScope}</span>
+      )}
+    </p>
+  );
 }
 
 function PostRow({ post, engagement }: { post: SentPost; engagement?: EngagementResult }) {

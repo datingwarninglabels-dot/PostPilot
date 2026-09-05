@@ -28,6 +28,7 @@ const EVENT_LABELS: Record<string, string> = {
   comment_received: "Comment received",
   connection_added: "Account connected",
   connection_removed: "Account disconnected",
+  settings_changed: "Setting changed",
 };
 
 function firstParam(v: string | string[] | undefined): string | undefined {
@@ -51,7 +52,8 @@ function parseFilters(sp: Record<string, string | string[] | undefined>): Activi
       entityType === "post" ||
       entityType === "reply" ||
       entityType === "comment" ||
-      entityType === "connection"
+      entityType === "connection" ||
+      entityType === "settings"
         ? entityType
         : undefined,
     eventType: eventType && EVENT_LABELS[eventType] ? (eventType as ActivityFilters["eventType"]) : undefined,
@@ -142,6 +144,7 @@ export default async function ActivityPage({
               <option value="reply">Replies</option>
               <option value="comment">Comments</option>
               <option value="connection">Connections</option>
+              <option value="settings">Settings</option>
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-muted">

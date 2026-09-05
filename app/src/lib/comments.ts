@@ -1,6 +1,7 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase-admin";
 import { logActivity } from "./activity";
+import { maybeAutoDraftReply } from "./auto-draft";
 import type { Platform } from "./posts";
 
 export type MessageType = "comment" | "dm";
@@ -130,6 +131,15 @@ export async function upsertIncomingComment(input: {
         input.authorName ?? "someone"
       }`,
       detail: { body: input.body.slice(0, 500) },
+    });
+
+    // Opt-in, approval-gated: this only ever creates a draft (status "draft").
+    // Sending still requires the owner to Approve and Send on /comments.
+    await maybeAutoDraftReply({
+      commentId: inserted.id,
+      platform: input.platform,
+      messageType: input.messageType,
+      body: input.body,
     });
   }
 }

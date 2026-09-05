@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
     status:
       status === "success" || status === "failure" || status === "info" ? status : undefined,
     entityType:
-      entity === "post" || entity === "reply" || entity === "comment" || entity === "connection"
+      entity === "post" ||
+      entity === "reply" ||
+      entity === "comment" ||
+      entity === "connection" ||
+      entity === "settings"
         ? entity
         : undefined,
     eventType: (event as ActivityFilters["eventType"]) || undefined,

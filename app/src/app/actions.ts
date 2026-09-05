@@ -14,6 +14,7 @@ import { getCommentById } from "@/lib/comments";
 import { getPostById } from "@/lib/posts";
 import { publishPost, reconcileSubmittedPost } from "@/lib/publish";
 import { logActivity } from "@/lib/activity";
+import { setAutoDraftReplies } from "@/lib/settings";
 import { type ActionResult, ok, fail, toUserMessage } from "@/lib/action-result";
 import { sendReply as sendFacebookReply } from "@/lib/repliers/facebook";
 import { sendReply as sendInstagramReply } from "@/lib/repliers/instagram";
@@ -372,6 +373,32 @@ export async function disconnectConnectionAction(id: string): Promise<ActionResu
     });
     revalidateAll();
     return ok("Disconnected.");
+  } catch (err) {
+    return fail(toUserMessage(err));
+  }
+}
+
+/**
+ * Opt-in toggle: when on, a new DM or a comment matching simple rules (a
+ * question, "still available", "price", etc.) gets an AI reply draft generated
+ * automatically. It is still just a draft — sending always requires Approve on
+ * /comments. Never default-on; the settings row starts false.
+ */
+export async function setAutoDraftAction(enabled: boolean): Promise<ActionResult> {
+  const user = await requireAdmin();
+  try {
+    await setAutoDraftReplies(enabled);
+    await logActivity({
+      actor: user.email,
+      eventType: "settings_changed",
+      entityType: "settings",
+      status: "success",
+      summary: enabled
+        ? "Turned on auto-drafting replies (still approval-gated to send)"
+        : "Turned off auto-drafting replies",
+    });
+    revalidateAll();
+    return ok(enabled ? "Auto-draft is on. Replies still need your approval to send." : "Auto-draft is off.");
   } catch (err) {
     return fail(toUserMessage(err));
   }

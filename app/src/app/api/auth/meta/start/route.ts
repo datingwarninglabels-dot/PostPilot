@@ -18,6 +18,9 @@ const META_OAUTH_SCOPES = [
   // pages_messaging is required for the Messenger Send API (DM replies).
   "pages_manage_engagement",
   "pages_messaging",
+  // Engagement view: reactions/comments/shares come with pages_read_engagement;
+  // read_insights adds post impressions / reach / video views.
+  "read_insights",
 ].join(",");
 
 export async function GET() {

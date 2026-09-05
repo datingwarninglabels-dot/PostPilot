@@ -14,6 +14,9 @@ const INSTAGRAM_OAUTH_SCOPES = [
   // Phase 3: read/reply to comments and DMs.
   "instagram_business_manage_comments",
   "instagram_business_manage_messages",
+  // Engagement view: like_count/comments_count come with instagram_business_basic;
+  // manage_insights adds reach / impressions / saves per media.
+  "instagram_business_manage_insights",
 ].join(",");
 
 export async function GET() {

@@ -291,6 +291,28 @@ UI: `/comments` (`app/src/app/comments/`), same card-list pattern as the dashboa
 silent. Approve-then-send only — **no auto-reply**, this is a settled product decision, don't wire
 one up.
 
+**Auto-draft (opt-in, never default-on)**: a `settings` singleton row (`auto_draft_replies`,
+default `false`) toggled from a switch on `/connections` (`setAutoDraftAction`). When on,
+`lib/auto-draft.ts`'s `maybeAutoDraftReply()` runs from `upsertIncomingComment()` for every
+genuinely-new comment/DM and, per `shouldAutoDraft()`, drafts a reply for any DM or a comment
+containing "?" or one of price/link/where/"how do I"/"still available" — skipping emoji-only
+text, comments under 3 words, and likely spam (link + promo language) — capped at
+`HOURLY_CAP` (20) drafts/hour (counted from `activity_log`). It only ever inserts a `replies` row
+at `status: "draft"` and flips the comment to `reply_drafted` — sending still requires Approve on
+`/comments`, unchanged. `META_OAUTH_SCOPES`/`INSTAGRAM_OAUTH_SCOPES`/`TIKTOK_OAUTH_SCOPES` also
+gained `read_insights`/`instagram_business_manage_insights`/`video.list` for `/history`'s
+engagement numbers (see below) — accounts connected before this change need reconnecting to pick
+up the new scopes.
+
+**Engagement (`/history`)**: `lib/insights.ts`'s `fetchPostEngagement()` pulls live
+likes/comments/shares (Facebook: `reactions.summary`/`comments.summary`/`shares`; Instagram:
+`like_count`/`comments_count`) and, where the scope is granted, reach (`post_impressions_unique`
+via `read_insights` / `reach` via `instagram_business_manage_insights`). TikTok would use
+`/v2/video/query/` (needs `video.list`) but there's no TikTok connection to test against yet.
+Confirmed live against production 2026-09-04: Facebook and Instagram basic counts work with the
+scopes already granted; Instagram reach fails with `"Application does not have permission for
+this action"` (code 10) until reconnected with the new scope.
+
 **Manual setup only the account owner can do**, same category as Phase 2's OAuth redirect URIs — now
 that the app is deployed (see Deployment below), the last two steps are outstanding: configure the
 Webhooks product on each Meta app (App Dashboard → Webhooks) pointing at

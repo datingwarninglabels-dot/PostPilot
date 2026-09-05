@@ -1,7 +1,9 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { listConnectionsWithHealth } from "@/lib/platform-connections";
+import { getSettings } from "@/lib/settings";
 import { AppHeader } from "@/components/app-header";
 import { ConnectionsList } from "./connections-list";
+import { AutomationSettings } from "./automation-settings";
 
 export const metadata = { title: "Connections" };
 
@@ -11,8 +13,9 @@ export default async function ConnectionsPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   await requireAdmin();
-  const [connections, { error }] = await Promise.all([
+  const [connections, settings, { error }] = await Promise.all([
     listConnectionsWithHealth(),
+    getSettings(),
     searchParams,
   ]);
 
@@ -32,6 +35,9 @@ export default async function ConnectionsPage({
           </div>
         )}
         <ConnectionsList connections={connections} />
+
+        <h2 className="mt-8 mb-3 text-sm font-medium text-muted">Automation</h2>
+        <AutomationSettings enabled={settings.auto_draft_replies} />
       </main>
     </>
   );

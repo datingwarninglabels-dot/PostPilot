@@ -19,10 +19,11 @@ export type Engagement = {
   comments: number | null;
   shares: number | null;
   views: number | null;
+  reach: number | null;
 };
 
 export type EngagementResult =
-  | { ok: true; engagement: Engagement }
+  | { ok: true; engagement: Engagement; missingScope?: string }
   | { ok: false; error: string; missingScope?: string };
 
 const TIMEOUT_MS = 8000;
@@ -90,10 +91,8 @@ export function summarizeEngagement(
   for (const p of posts) {
     const r = results.get(p.id);
     if (!r) continue;
-    if (!r.ok) {
-      if (r.missingScope) missingScopes.add(r.missingScope);
-      continue;
-    }
+    if (r.missingScope) missingScopes.add(r.missingScope);
+    if (!r.ok) continue;
     if (p.published_at && new Date(p.published_at).getTime() < cutoff) continue;
     likes += r.engagement.likes ?? 0;
     comments += r.engagement.comments ?? 0;
@@ -117,6 +116,32 @@ function metaError(data: unknown): EngagementResult {
   return { ok: false, error: message, missingScope };
 }
 
+/** Pulls one insights metric ("reach"); returns the number, or a scope name if
+ *  the token lacks read_insights / instagram_business_manage_insights. */
+async function metaReach(
+  host: string,
+  id: string,
+  metric: string,
+  accessToken: string
+): Promise<{ reach: number | null; missingScope?: string }> {
+  const url = new URL(`https://${host}/${GRAPH_VERSION}/${id}/insights`);
+  url.searchParams.set("metric", metric);
+  url.searchParams.set("access_token", accessToken);
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const data = await res.json();
+    if (!res.ok) {
+      const scope = host.includes("instagram")
+        ? "instagram_business_manage_insights"
+        : "read_insights";
+      return { reach: null, missingScope: scope };
+    }
+    return { reach: data.data?.[0]?.values?.[0]?.value ?? data.data?.[0]?.total_value?.value ?? null };
+  } catch {
+    return { reach: null };
+  }
+}
+
 async function facebook(c: DecryptedConnection, id: string): Promise<EngagementResult> {
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${id}`);
   url.searchParams.set(
@@ -125,9 +150,12 @@ async function facebook(c: DecryptedConnection, id: string): Promise<EngagementR
   );
   url.searchParams.set("access_token", c.access_token);
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  const data = await res.json();
-  if (!res.ok) return metaError(data);
+  const [countsRes, reach] = await Promise.all([
+    fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) }),
+    metaReach("graph.facebook.com", id, "post_impressions_unique", c.access_token),
+  ]);
+  const data = await countsRes.json();
+  if (!countsRes.ok) return metaError(data);
 
   return {
     ok: true,
@@ -136,7 +164,9 @@ async function facebook(c: DecryptedConnection, id: string): Promise<EngagementR
       comments: data.comments?.summary?.total_count ?? null,
       shares: data.shares?.count ?? null,
       views: null,
+      reach: reach.reach,
     },
+    missingScope: reach.missingScope,
   };
 }
 
@@ -145,9 +175,12 @@ async function instagram(c: DecryptedConnection, id: string): Promise<Engagement
   url.searchParams.set("fields", "like_count,comments_count");
   url.searchParams.set("access_token", c.access_token);
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  const data = await res.json();
-  if (!res.ok) return metaError(data);
+  const [countsRes, reach] = await Promise.all([
+    fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) }),
+    metaReach("graph.instagram.com", id, "reach", c.access_token),
+  ]);
+  const data = await countsRes.json();
+  if (!countsRes.ok) return metaError(data);
 
   return {
     ok: true,
@@ -156,7 +189,9 @@ async function instagram(c: DecryptedConnection, id: string): Promise<Engagement
       comments: data.comments_count ?? null,
       shares: null,
       views: null,
+      reach: reach.reach,
     },
+    missingScope: reach.missingScope,
   };
 }
 
@@ -199,6 +234,7 @@ async function tiktok(c: DecryptedConnection, id: string): Promise<EngagementRes
       comments: v.comment_count ?? null,
       shares: v.share_count ?? null,
       views: v.view_count ?? null,
+      reach: null,
     },
   };
 }

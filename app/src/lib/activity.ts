@@ -29,9 +29,10 @@ export type ActivityEventType =
   | "reply_send_attempt"
   | "comment_received"
   | "connection_added"
-  | "connection_removed";
+  | "connection_removed"
+  | "settings_changed";
 
-export type ActivityEntityType = "post" | "reply" | "comment" | "connection";
+export type ActivityEntityType = "post" | "reply" | "comment" | "connection" | "settings";
 export type ActivityStatus = "success" | "failure" | "info";
 
 export type ActivityLogEntry = {
