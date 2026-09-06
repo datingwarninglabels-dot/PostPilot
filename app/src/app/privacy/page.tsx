@@ -52,8 +52,12 @@ export default function PrivacyPolicyPage() {
       <p className="mb-4">
         Tokens are deleted immediately when the owner disconnects an account in PostPilot; the
         owner can also revoke access from the platform&apos;s own settings. Post, comment, and
-        activity records are retained for the owner&apos;s reference and can be deleted on request
-        to the contact address below.
+        activity records are retained for the owner&apos;s reference and can be deleted on
+        request — see{" "}
+        <a href="/data-deletion" className="underline">
+          Data Deletion Instructions
+        </a>
+        .
       </p>
 
       <h2 className="mt-6 mb-2 font-semibold">Contact</h2>

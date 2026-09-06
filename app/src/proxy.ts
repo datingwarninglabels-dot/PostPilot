@@ -41,13 +41,15 @@ export async function proxy(request: NextRequest) {
   const isAuthorized = !!user && !!adminEmail && user.email === adminEmail;
 
   const { pathname } = request.nextUrl;
-  // /privacy and /terms must be publicly reachable — TikTok's (and Meta's)
-  // app review fetches them directly, with no session. Same for the TikTok
-  // domain verification file — its verifier fetches it anonymously too.
+  // /privacy, /terms, and /data-deletion must be publicly reachable —
+  // TikTok's (and Meta's) app review fetches them directly, with no session.
+  // Same for the TikTok domain verification file — its verifier fetches it
+  // anonymously too.
   const isPublicRoute =
     pathname === "/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
+    pathname === "/data-deletion" ||
     pathname === "/tiktokYlkFm0zt9urSP3yMqgIC83NzVdBDwjsg.txt";
 
   if (!isPublicRoute && !isAuthorized) {
