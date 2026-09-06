@@ -14,6 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://postpilot.xyz"),
   title: {
     default: "PostPilot",
     template: "%s · PostPilot",
