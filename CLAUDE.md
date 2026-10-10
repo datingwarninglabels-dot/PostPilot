@@ -24,6 +24,10 @@ access (your own accounts only) works without waiting on review; Phase 1 doesn't
 
 ## Current state of this repo
 
+See `docs/AUDIT-STATUS.md` for a scannable "what's done / what's outstanding" summary against the
+audit briefs in `docs/audit-brief-original.md` and `docs/audit-brief-refined.md` — this file below
+has the technical how-it-works detail.
+
 - `app/` — Next.js (App Router, TypeScript, Tailwind v4) + Supabase, scaffolded fresh (not copied from
   the quiz app, since the two have very different shapes — this is an internal tool, not a public
   funnel). Has its own `CLAUDE.md`/`AGENTS.md` pointing out that this Next.js version (16) may postdate
