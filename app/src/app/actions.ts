@@ -326,6 +326,11 @@ export async function publishPostNowAction(id: string): Promise<ActionResult> {
     revalidateAll();
 
     if (!outcome.ok) return fail(outcome.error);
+    if (outcome.status === "dry_run") {
+      return ok(
+        `[DRY RUN] Would publish to ${post.platform} · ${outcome.accountName}. Nothing was sent — post status unchanged. See /activity for the record.`
+      );
+    }
     return outcome.status === "submitted"
       ? ok(
           `Submitted to TikTok (${outcome.accountName}). TikTok is still processing it — not confirmed live yet.`

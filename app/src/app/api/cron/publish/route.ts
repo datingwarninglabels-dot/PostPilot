@@ -47,7 +47,14 @@ export async function GET(request: NextRequest) {
     const outcome = await publishPost(post, "system:cron");
     published.push(
       outcome.ok
-        ? { id: post.id, status: outcome.status, detail: outcome.platformPostId }
+        ? {
+            id: post.id,
+            status: outcome.status,
+            detail:
+              outcome.status === "dry_run"
+                ? "[dry run] no platform API called"
+                : outcome.platformPostId,
+          }
         : { id: post.id, status: "failed", detail: outcome.error }
     );
   }

@@ -13,8 +13,17 @@ const PUBLISHERS: Record<Platform, typeof publishToFacebook> = {
   tiktok: publishToTikTok,
 };
 
+/**
+ * Safety valve for verifying the publish pipeline without touching a real
+ * platform. Must be the exact string "true" — unset, empty, or any other
+ * value keeps normal (live) behavior. Off by default; not set in any real
+ * environment unless someone deliberately adds it for a verification session.
+ */
+const DRY_RUN_PUBLISH = process.env.PUBLISH_DRY_RUN === "true";
+
 export type PublishOutcome =
   | { ok: true; status: "published" | "submitted"; platformPostId: string; accountName: string }
+  | { ok: true; status: "dry_run"; accountName: string }
   | { ok: false; error: string };
 
 /**
@@ -41,6 +50,33 @@ export async function publishPost(post: Post, actor: string): Promise<PublishOut
     }
 
     const connection = resolved.connection;
+
+    if (DRY_RUN_PUBLISH) {
+      // Resolves the real target account and gets this far exactly like a real
+      // publish would, but NEVER calls a platform API, and NEVER touches
+      // `posts.status`/`published_at`/`platform_post_id` — the post row is left
+      // completely unchanged. The only trace is this activity_log row, clearly
+      // marked as a dry run, so it can never be mistaken for a real publish on
+      // /history, /activity, or the dashboard.
+      await logActivity({
+        actor,
+        eventType: "post_publish_attempt",
+        entityType: "post",
+        entityId: post.id,
+        platform: post.platform,
+        accountName: connection.account_name,
+        status: "info",
+        summary: `[DRY RUN] Would publish to ${connection.platform} · ${connection.account_name} — no platform API was called, post status unchanged`,
+        detail: {
+          dry_run: true,
+          used_fallback_account: resolved.kind === "fallback",
+          content_length: post.content.length,
+          has_media: post.media_urls.length > 0,
+        },
+      });
+      return { ok: true, status: "dry_run", accountName: connection.account_name };
+    }
+
     const newStatus: "published" | "submitted" =
       post.platform === "tiktok" ? "submitted" : "published";
 
